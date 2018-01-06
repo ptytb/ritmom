@@ -205,8 +205,12 @@ class Translator:
             self.streams[language_pair]['count'] += 1
 
         for language_pair in self.streams:
-            self.streams[language_pair]['stream'].Close()
-            print(f"{language_pair}: total {self.streams[language_pair]['count']} words")
+            count = self.streams[language_pair]['count']
+            if count % self.words_per_audio != 0:
+                self.streams[language_pair]['stream'].Close()
+                print(f"{language_pair}: total {count} words")
+                track_num = count // self.words_per_audio
+                self.start_convert(language_pair, track_num)  # Conversion and deletion in a separate process
 
 
 def get_source(file_path):
