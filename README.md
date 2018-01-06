@@ -19,15 +19,15 @@ some proprietary TTS engine to generate a good quality narration.
 
 1. Install TTS engines
 2. You will need *ffmpeg* executable in your PATH to convert your tracks to MP3.
-3. Save phrases to `phrases/` dir
+3. Save phrases to `phrases/` dir, both *csv* or *xls* will fit:
 ![](doc/howto-google-translate.png)
 4. `pip install -r requirements.txt`
-5. `python main.py`
+5. Edit *config.json* file.
+**foreign** and **native** parameters must contain substring of description, which can be listed
+with this command: `python main.py -l`
+6. `python main.py`
 
 
 ## TODO
 
-- [ ] Tidy up this mess
-- [ ] Separate dirs for distinct languages
-- [ ] Move translator configuration to the separate file
 - [ ] Add audition for separate words from some text corpus (shoot an example with context-bound usage) using NLTK

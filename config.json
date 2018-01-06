@@ -1,0 +1,40 @@
+{
+    "words_per_audio": 100,
+
+    "phrasebook": "phrases/Phrasebook.csv",
+
+    "default": "EnglishRussian",
+
+    "languages": {
+        "EnglishRussian": {
+            "foreign1": "Salli",
+            "foreign2": "Brian",
+            "native": "Milena"
+        },
+        "RussianEnglish": {
+          "foreign1": "Milena",
+          "foreign2": "Milena",
+          "native": "Salli"
+        },
+        "JapaneseEnglish":{
+            "foreign1": "Salli",
+            "foreign2": "Salli",
+            "native": "Salli"
+        },
+        "JapaneseRussian":{
+          "foreign1": "Salli",
+          "foreign2": "Salli",
+          "native": "Milena"
+        }
+    },
+
+    "sounds": {
+        "silence": "silence 0.2",
+        "silence_long": "silence 0.5",
+        "end_of_part": "sounds/ding.wav"
+    },
+
+    "pattern": [
+        "foreign1", "silence", "foreign2", "silence", "silence_long"
+    ]
+}
