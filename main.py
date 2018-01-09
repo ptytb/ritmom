@@ -22,16 +22,33 @@ from nltk.stem import WordNetLemmatizer
 from nltk.text import ConcordanceIndex
 
 
+import pickle
+import dill
+
+from os.path import exists
+
+
 class PhraseSampler:
     def __init__(self, language):
         corpus_names = app_config['phraseExamples'][language]
 
-        self.texts = dict()
-        self.indices = dict()
-        for corpus_name in corpus_names:
-            corpus = getattr(nltk.corpus, corpus_name)
-            text = self.texts[corpus_name] = nltk.Text(corpus.words())
-            self.indices[corpus_name] = ConcordanceIndex(text.tokens, key=lambda s: s.lower())
+        if exists(f'cache/{language}.idx'):
+            print('\nfound cache, loading...', end='', flush=True)
+            with open(f'cache/{language}.t', 'rb') as f:
+                self.texts = dill.load(f)
+            with open(f'cache/{language}.idx', 'rb') as f:
+                self.indices = dill.load(f)
+        else:
+            self.texts = dict()
+            self.indices = dict()
+            for corpus_name in corpus_names:
+                corpus = getattr(nltk.corpus, corpus_name)
+                text = self.texts[corpus_name] = nltk.Text(corpus.words())
+                self.indices[corpus_name] = ConcordanceIndex(text.tokens, key=lambda s: s.lower())
+            with open(f'cache/{language}.t', 'wb') as f:
+                dill.dump(self.texts, f, )
+            with open(f'cache/{language}.idx', 'wb') as f:
+                dill.dump(self.indices, f, )
 
         self.lemmatizer = WordNetLemmatizer()
         self.language = language

@@ -35,14 +35,17 @@ some proprietary TTS engine to generate a good quality narration.
 with this command: `python main.py -l`
 
 Download desired text corpuses to be able to generate context usage phrases.
-Corpuses are listed in `phraseExamples` configuration option.
+Corpuses are listed in a `phraseExamples` configuration option:
 
 `import nltk; nltk.download()`
 
-6. `python main.py` 
+6. Generate audio `python main.py` 
 
 
 ## TODO
 
 - [ ] Use more threads for TTS
-- [ ] Make sequence editable from a config
+- [ ] Make a sequence configurable from a config
+- [X] Pickle indices for corpus for quicker start
+- [ ] Add wordnet: definition (thesaurus, examples)
+- [X] Update requirements.txt
