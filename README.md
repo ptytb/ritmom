@@ -2,11 +2,18 @@ RITMOM - Repetition is the mother of memory.
 
 
 ### What this app does
-Learning languages.
+It's for learning languages.
 Creates audio tracks sourcing a word and phrase pairs from your Google Translate favorites list.
 
-The idea is to use formula
-"foreign female slow - native female normal - pause - foreign male slow - native female normal - long pause"
+The idea is to use a sequence
+
+- foreign female slow
+- native female normal
+- example usage phrase female
+- foreign male slow
+- native female normal
+- example usage phrase male
+
 for better memorization.
 
 
@@ -23,11 +30,19 @@ some proprietary TTS engine to generate a good quality narration.
 ![](doc/howto-google-translate.png)
 4. `pip install -r requirements.txt`
 5. Edit *config.json* file.
+
 **foreign** and **native** parameters must contain substring of description, which can be listed
 with this command: `python main.py -l`
-6. `python main.py`
+
+Download desired text corpuses to be able to generate context usage phrases.
+Corpuses are listed in `phraseExamples` configuration option.
+
+`import nltk; nltk.download()`
+
+6. `python main.py` 
 
 
 ## TODO
 
-- [ ] Add audition for separate words from some text corpus (shoot an example with context-bound usage) using NLTK
+- [ ] Use more threads for TTS
+- [ ] Make sequence editable from a config

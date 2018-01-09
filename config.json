@@ -35,6 +35,16 @@
     },
 
     "pattern": [
-        "foreign1", "silence", "foreign2", "silence", "silence_long"
-    ]
+        "foreign1", "silence", "foreign2", "silence", "silence_long", "example", "silence_long"
+    ],
+
+    "phraseExamples": {
+        "english": ["brown", "gutenberg"],
+        "japanese": ["knbc", "jeita"]
+    },
+
+    "phraseJoinChar": {
+        "english": " ",
+        "japanese": ""
+    }
 }

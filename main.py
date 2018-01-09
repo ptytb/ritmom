@@ -16,6 +16,54 @@ import csv
 import re
 import argparse
 
+import nltk.corpus
+import nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.text import ConcordanceIndex
+
+
+class PhraseSampler:
+    def __init__(self, language):
+        corpus_names = app_config['phraseExamples'][language]
+
+        self.texts = dict()
+        self.indices = dict()
+        for corpus_name in corpus_names:
+            corpus = getattr(nltk.corpus, corpus_name)
+            text = self.texts[corpus_name] = nltk.Text(corpus.words())
+            self.indices[corpus_name] = ConcordanceIndex(text.tokens, key=lambda s: s.lower())
+
+        self.lemmatizer = WordNetLemmatizer()
+        self.language = language
+
+    def get_sample_phrase(self, word):
+        sentences = list()
+        boundary_chars = ('.', ',', ':', '!', ';', '(', ')', '"', '、', '。', '\n')
+
+        for corpus_name in self.indices:
+            index = self.indices[corpus_name]
+            text = self.texts[corpus_name]
+
+            for offset in index.offsets(word):
+                sentence_start = offset
+                boundary_limit = 5
+                while text[sentence_start] not in boundary_chars and sentence_start > 0 and boundary_limit > 0:
+                    sentence_start -= 1
+                    boundary_limit -= 1
+
+                sentence_end = offset
+                boundary_limit = 5
+                while text[sentence_end] not in boundary_chars and sentence_end < len(text) and boundary_limit > 0:
+                    sentence_end += 1
+                    boundary_limit -= 1
+
+                sentence = text[sentence_start + 1:sentence_end]
+                if len(sentence) > 1:
+                    sentences.append(app_config['phraseJoinChar'][self.language].join(sentence) + '.')
+
+        shortest_sentence = list(sorted(sentences, key=len))[0] if len(sentences) > 0 else None
+        return shortest_sentence
+
 
 def unroll_multi_line_cell(gen_lines_func):
     def lines_func(*args):
@@ -107,16 +155,12 @@ class Sounds:
         return self.sounds[key]
 
 
-def list_engines():
-    engine = CreateObject("SAPI.SpVoice")
-    voices = engine.GetVoices()
-    for i in range(voices.Count):
-        desc = voices.Item(i).GetDescription()
-        print(f'#{i} {desc}')
-
-
 class Translator:
     def __init__(self, *, languages, words_per_audio=10, sounds):
+        def split_name_pair(name_pair):
+            i = list(re.finditer(r'[A-Z]', language_pair))[1].span()[0]
+            return name_pair[:i].lower(), name_pair[i:].lower()
+
         self.engine = CreateObject("SAPI.SpVoice")
         self.words_per_audio = words_per_audio
         self.voices = dict()
@@ -124,6 +168,11 @@ class Translator:
         self.voices_com = voices = self.engine.GetVoices()
         for language_pair in languages:
             self.voices[language_pair] = dict()
+
+            foreign_name, native_name = split_name_pair(language_pair)
+            self.voices[language_pair]['native_name'] = native_name
+            self.voices[language_pair]['foreign_name'] = foreign_name
+
             for purpose in languages[language_pair]:
                 for i in range(voices.Count):
                     desc = voices.Item(i).GetDescription()
@@ -136,10 +185,16 @@ class Translator:
         self.sounds = Sounds(sounds)
         self.streams = dict()
 
+        print('Indexing phrase examples...', end='', flush=True)
+        self.samplers = dict()
+        for language in app_config['phraseExamples']:
+            self.samplers[language] = PhraseSampler(language)
+        print('done.')
+
     @staticmethod
     def start_convert(language_pair, fn):
         cmd_str = [
-            *rf'ffmpeg -i audio/{language_pair}/audio{fn:03}.wav -codec:a libmp3lame -qscale:a 2 audio/{language_pair}/audio{fn:03}.mp3 && del audio\{language_pair}\audio{fn:03}.wav'.split(sep=' ')
+            *rf'ffmpeg -y -i audio/{language_pair}/audio{fn:03}.wav -codec:a libmp3lame -qscale:a 2 audio/{language_pair}/audio{fn:03}.mp3 && del audio\{language_pair}\audio{fn:03}.wav'.split(sep=' ')
         ]
         Popen(cmd_str, shell=True)
 
@@ -159,6 +214,17 @@ class Translator:
         stream.Open(f'audio/{language_pair}/audio{fn:03}.wav', SpeechLib.SSFMCreateForWrite)
         engine.AudioOutputStream = stream
         return engine, stream
+
+    def get_sample_phrase(self, foreign_name, word):
+        if foreign_name not in self.samplers:
+            return None
+        example = self.samplers[foreign_name].get_sample_phrase(word)
+        if example is None:
+            # Try to find example for lemmatized form
+            base_form = self.samplers[foreign_name].lemmatizer.lemmatize(word)
+            if base_form != word:
+                example = self.samplers[foreign_name].get_sample_phrase(word)
+        return example
 
     def translate(self, source):
         lines = source.lines()
@@ -199,11 +265,22 @@ class Translator:
                     engine.SpeakStream(self.sounds['silence'])
 
                     engine.SpeakStream(self.sounds['silence_long'])
+
+                    if ' ' not in word:
+                        foreign_name = self.voices[language_pair]['foreign_name']
+                        example = self.get_sample_phrase(foreign_name, word)
+                        if example is not None:
+                            engine.Rate = 0
+                            engine.Volume = 100
+                            engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                            engine.Speak(example)
+                            engine.SpeakStream(self.sounds['silence_long'])
             except Exception as e:
                 print(f'{word} = {trans}: {str(e)}')
+            else:
+                self.streams[language_pair]['count'] += 1
 
-            self.streams[language_pair]['count'] += 1
-
+        # Close and convert last tracks
         for language_pair in self.streams:
             count = self.streams[language_pair]['count']
             if count % self.words_per_audio != 0:
@@ -220,6 +297,14 @@ def get_source(file_path):
         return CsvSource(file_path)
     else:
         raise Exception(f'Type of source "{file_path}" is undetermined')
+
+
+def list_engines():
+    engine = CreateObject("SAPI.SpVoice")
+    voices = engine.GetVoices()
+    for i in range(voices.Count):
+        desc = voices.Item(i).GetDescription()
+        print(f'#{i} {desc}')
 
 
 if __name__ == '__main__':
