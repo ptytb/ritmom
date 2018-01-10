@@ -47,5 +47,5 @@ Corpuses are listed in a `phraseExamples` configuration option:
 - [ ] Use more threads for TTS
 - [ ] Make a sequence configurable from a config
 - [X] Pickle indices for corpus for quicker start
-- [ ] Add wordnet: definition (thesaurus, examples)
+- [X] Add wordnet: definition (thesaurus, examples, excerpts)
 - [X] Update requirements.txt

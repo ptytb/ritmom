@@ -20,7 +20,7 @@ import nltk.corpus
 import nltk
 from nltk.stem import WordNetLemmatizer
 from nltk.text import ConcordanceIndex
-
+from nltk.corpus import wordnet
 
 import pickle
 import dill
@@ -33,7 +33,7 @@ class PhraseSampler:
         corpus_names = app_config['phraseExamples'][language]
 
         if exists(f'cache/{language}.idx'):
-            print('\nfound cache, loading...', end='', flush=True)
+            print('\ncache found, loading...', end='', flush=True)
             with open(f'cache/{language}.t', 'rb') as f:
                 self.texts = dill.load(f)
             with open(f'cache/{language}.idx', 'rb') as f:
@@ -75,11 +75,24 @@ class PhraseSampler:
                     boundary_limit -= 1
 
                 sentence = text[sentence_start + 1:sentence_end]
-                if len(sentence) > 1:
+                if len(sentence) > 3:
                     sentences.append(app_config['phraseJoinChar'][self.language].join(sentence) + '.')
 
         shortest_sentence = list(sorted(sentences, key=len))[0] if len(sentences) > 0 else None
         return shortest_sentence
+
+    def get_definitions(self, word):
+        language_nltk_naming = {
+            "english": "eng",
+            "japanese": "jpn",
+        }
+        definitions, examples = None, None
+        synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
+        if synsets is not None:
+            synsets = [synset for synset in synsets if synset.name().split('.')[0] == word]
+            examples = [example for examples in [synset.examples() for synset in synsets] for example in examples]
+            definitions = [s.definition() for s in synsets]
+        return definitions, examples
 
 
 def unroll_multi_line_cell(gen_lines_func):
@@ -250,6 +263,9 @@ class Translator:
             if language_pair not in app_config['languages']:
                 continue
 
+            native_name = self.voices[language_pair]['native_name']
+            foreign_name = self.voices[language_pair]['foreign_name']
+
             if language_pair in self.streams:
                 engine, stream = self.streams[language_pair]['engine'], self.streams[language_pair]['stream']
             else:
@@ -279,14 +295,39 @@ class Translator:
                     engine.Voice = self.voices_com.Item(self.voices[language_pair]['native'])
                     engine.Speak(f'{trans}.')
                     
-                    engine.SpeakStream(self.sounds['silence'])
-
                     engine.SpeakStream(self.sounds['silence_long'])
 
+                    definitions, examples = self.samplers[foreign_name].get_definitions(word)
+
+                    if definitions is not None:
+                        for definition in definitions:
+                            engine.Volume = 50
+                            engine.SpeakStream(self.sounds['definition'])
+                            engine.SpeakStream(self.sounds['silence'])
+                            engine.Volume = 100
+                            engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                            engine.Speak(definition + '.')
+                            engine.SpeakStream(self.sounds['silence_long'])
+
+                    if examples is not None:
+                        for example in examples:
+                            engine.Volume = 50
+                            engine.SpeakStream(self.sounds['excerpt'])
+                            engine.SpeakStream(self.sounds['silence'])
+
+                            engine.Rate = 0
+                            engine.Volume = 100
+                            engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                            engine.Speak(example)
+                            engine.SpeakStream(self.sounds['silence_long'])
+
                     if ' ' not in word:
-                        foreign_name = self.voices[language_pair]['foreign_name']
                         example = self.get_sample_phrase(foreign_name, word)
                         if example is not None:
+                            engine.Volume = 50
+                            engine.SpeakStream(self.sounds['excerpt'])
+                            engine.SpeakStream(self.sounds['silence'])
+
                             engine.Rate = 0
                             engine.Volume = 100
                             engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
