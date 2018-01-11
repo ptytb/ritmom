@@ -1,5 +1,7 @@
 # coding: utf-8
 import traceback
+from itertools import islice
+from multiprocessing.pool import Pool
 
 from comtypes.client import CreateObject
 from multiprocessing import Queue, Process
@@ -14,7 +16,7 @@ from operator import contains
 from functools import partial
 
 from os.path import abspath
-from os import mkdir
+from os import mkdir, cpu_count
 from json import load
 import csv
 import re
@@ -292,31 +294,31 @@ class AudioBuilder:
                 example = self.samplers[foreign_name].get_excerpt(word)
         return example
 
-    def make_audio_tracks(self, source):
-        lines = source.lines()
+    def make_audio_track(self, language_pair, lines, track_num):
+        engine, stream = self._get_engine(language_pair, track_num)
 
-        for language_pair, word, trans in lines:
+        for word, trans in lines:
             if language_pair not in app_config['languages']:
-                continue
+                return
 
             native_name = self.voices[language_pair]['native_name']
             foreign_name = self.voices[language_pair]['foreign_name']
 
-            if language_pair in self.streams:
-                engine, stream = self.streams[language_pair]['engine'], self.streams[language_pair]['stream']
-            else:
-                engine, stream = self._get_engine(language_pair, 0)
-            count = self.streams[language_pair]['count']
+            # if language_pair in self.streams:
+            #     engine, stream = self.streams[language_pair]['engine'], self.streams[language_pair]['stream']
+            # else:
+            #     engine, stream = self._get_engine(language_pair, 0)
+            # count = self.streams[language_pair]['count']
 
-            if count % self.words_per_audio == 0 and count > 0:
-                # Start a new audio track file
-                engine.SpeakStream(self.sounds['end_of_part'])
-                stream.Close()
-                track_num = count // self.words_per_audio
-                if track_num > 0:
-                    self._start_conversion_process(language_pair, track_num - 1)  # Conversion and deletion in a separate process
-                engine, stream = self._get_engine(language_pair, track_num)
-                
+            # if count % self.words_per_audio == 0 and count > 0:
+            #     # Start a new audio track file
+            #     engine.SpeakStream(self.sounds['end_of_part'])
+            #     stream.Close()
+            #     track_num = count // self.words_per_audio
+            #     if track_num > 0:
+            #         self._start_conversion_process(language_pair, track_num - 1)  # Conversion and deletion in a separate process
+            #     engine, stream = self._get_engine(language_pair, track_num)
+
             # Say a phrase with both male and female narrators
             for voice_num in range(1, 3):
                 engine.Rate = -6
@@ -373,16 +375,19 @@ class AudioBuilder:
                     engine.Speak(excerpt)
                     engine.SpeakStream(self.sounds['silence_long'])
 
-            self.streams[language_pair]['count'] += 1
+            # self.streams[language_pair]['count'] += 1
 
-        # Close and convert last tracks
-        for language_pair in self.streams:
-            count = self.streams[language_pair]['count']
-            if count % self.words_per_audio != 0:
-                self.streams[language_pair]['stream'].Close()
-                print(f"{language_pair}: total {count} words")
-                track_num = count // self.words_per_audio
-                self._start_conversion_process(language_pair, track_num)  # Conversion and deletion in a separate process
+        self.streams[language_pair]['stream'].Close()
+        self._start_conversion_process(language_pair, track_num)
+
+        # # Close and convert last tracks
+        # for language_pair in self.streams:
+        #     count = self.streams[language_pair]['count']
+        #     if count % self.words_per_audio != 0:
+        #         self.streams[language_pair]['stream'].Close()
+        #         print(f"{language_pair}: total {count} words")
+        #         track_num = count // self.words_per_audio
+        #         self._start_conversion_process(language_pair, track_num)  # Conversion and deletion in a separate process
 
 
 class EncoderWorker(Process):
@@ -429,6 +434,22 @@ def list_engines():
         print(f'#{i} {desc}')
 
 
+def init_audio_builder(_encode_queue):
+    global audio_builder
+    global app_config
+    global encode_queue
+    app_config = load(open('config.json'))
+    audio_builder = AudioBuilder(languages=app_config['languages'],
+                                 words_per_audio=app_config['words_per_audio'],
+                                 sounds=app_config['sounds'])
+    encode_queue = _encode_queue
+
+
+def make_audio_track(language_pair, items, part_number):
+    global audio_builder
+    audio_builder.make_audio_track(language_pair, items, part_number)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', help='List voice engines', action='store_true')
@@ -438,15 +459,32 @@ if __name__ == '__main__':
         list_engines()
         exit(0)
 
-    app_config = load(open('config.json'))
-    audio_builder = AudioBuilder(languages=app_config['languages'],
-                                 words_per_audio=app_config['words_per_audio'],
-                                 sounds=app_config['sounds'])
-
     encode_queue = Queue()
     encode_worker = EncoderWorker(encode_queue)
     encode_worker.start()
 
     time_start = datetime.utcnow()
-    audio_builder.make_audio_tracks(source=get_source(app_config['phrasebook']))
+
+    app_config = load(open('config.json'))
+
+    phrasebook = get_source(app_config['phrasebook'])
+    with Pool(processes=cpu_count() - 1,
+              initializer=init_audio_builder,
+              initargs=(encode_queue,)) as pool:
+        builder_queue = dict()
+        builder_parts = dict()
+        for language_pair, word, trans in phrasebook.lines():
+            if language_pair not in builder_queue:
+                builder_queue[language_pair] = list()
+                builder_parts[language_pair] = 0
+            builder_queue[language_pair].append((word, trans))
+            if len(builder_queue[language_pair]) > app_config['words_per_audio']:
+                pool.apply_async(make_audio_track, (language_pair,
+                                                    builder_queue.pop(language_pair),
+                                                    builder_parts[language_pair]))
+                builder_queue[language_pair] = list()
+                builder_parts[language_pair] += 1
+        pool.close()
+        pool.join()
+
     print(f'time taken: {(datetime.utcnow() - time_start).total_seconds()} sec.')
