@@ -33,7 +33,8 @@
         "silence_long": "silence 0.5",
         "end_of_part": "sounds/ding.wav",
         "excerpt": "sounds/ripping-paper.wav",
-        "definition": "sounds/C-E-G.wav"
+        "definition": "sounds/C-E-G.wav",
+        "page_flipping": "sounds/page-flipping.wav"
     },
 
     "pattern": [

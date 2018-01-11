@@ -1,3 +1,5 @@
+# coding: utf-8
+
 from comtypes.client import CreateObject
 from win32com.client import Dispatch
 from comtypes.gen import SpeechLib
@@ -31,13 +33,12 @@ from os.path import exists
 class PhraseSampler:
     def __init__(self, language):
         corpus_names = app_config['phraseExamples'][language]
+        self.lemmatizer = WordNetLemmatizer()
+        self.language = language
 
         if exists(f'cache/{language}.idx'):
-            print('\ncache found, loading...', end='', flush=True)
-            with open(f'cache/{language}.t', 'rb') as f:
-                self.texts = dill.load(f)
-            with open(f'cache/{language}.idx', 'rb') as f:
-                self.indices = dill.load(f)
+            print('cache found, loading...', end='', flush=True)
+            self._load_cache()
         else:
             self.texts = dict()
             self.indices = dict()
@@ -45,15 +46,22 @@ class PhraseSampler:
                 corpus = getattr(nltk.corpus, corpus_name)
                 text = self.texts[corpus_name] = nltk.Text(corpus.words())
                 self.indices[corpus_name] = ConcordanceIndex(text.tokens, key=lambda s: s.lower())
-            with open(f'cache/{language}.t', 'wb') as f:
-                dill.dump(self.texts, f, )
-            with open(f'cache/{language}.idx', 'wb') as f:
-                dill.dump(self.indices, f, )
+            print('saving cache...', end='', flush=True)
+            self._save_cache()
 
-        self.lemmatizer = WordNetLemmatizer()
-        self.language = language
+    def _load_cache(self):
+        with open(f'cache/{self.language}.t', 'rb') as f:
+            self.texts = dill.load(f)
+        with open(f'cache/{self.language}.idx', 'rb') as f:
+            self.indices = dill.load(f)
 
-    def get_sample_phrase(self, word):
+    def _save_cache(self):
+        with open(f'cache/{self.language}.t', 'wb') as f:
+            dill.dump(self.texts, f)
+        with open(f'cache/{self.language}.idx', 'wb') as f:
+            dill.dump(self.indices, f)
+
+    def get_excerpt(self, word):
         sentences = list()
         boundary_chars = ('.', ',', ':', '!', ';', '(', ')', '"', '、', '。', '\n')
 
@@ -81,11 +89,24 @@ class PhraseSampler:
         shortest_sentence = list(sorted(sentences, key=len))[0] if len(sentences) > 0 else None
         return shortest_sentence
 
-    def get_definitions(self, word):
+    def get_definitions_jpn_experiments(self):
+        # synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
+        # jaconv.hira2kata(u'ともえまみ')
+
+        # analyzer = ASA(r'd:\prog\ASA\ASA20170503.jar')
+        # analyzer.parse('彼は村長だ')
+
+        # os.environ['CJKDATA'] = r'D:\Src\Lang\Nihon\cjkdata\cjkdata'
+        # from cjktools.resources.radkdict import RadkDict
+        # print(', '.join(RadkDict())[u'明'])
+        ...
+
+    def get_definitions_and_examples(self, word):
         language_nltk_naming = {
             "english": "eng",
             "japanese": "jpn",
         }
+
         definitions, examples = None, None
         synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
         if synsets is not None:
@@ -96,6 +117,11 @@ class PhraseSampler:
 
 
 def unroll_multi_line_cell(gen_lines_func):
+    """
+    Decorator for tidying the output of the dictionary sources
+    :param gen_lines_func: a function returning rows (possibly with multiline cells) from source
+    :return: a function returning tuple: LanguagePair, foreign word, translation to native
+    """
     def lines_func(*args):
         lines = gen_lines_func(*args)
         while True:
@@ -132,7 +158,7 @@ class ExcelSource:
         i = start
         gap = 0
         while not end or i > end:
-            word, trans = self.table[i]
+            word = self.table[i][0]
             
             if word is None:
                 gap += 1
@@ -140,7 +166,7 @@ class ExcelSource:
                     return
             else:
                 gap = 0
-                yield word, trans
+                yield self.table[i]
                 
             i += 1
 
@@ -185,7 +211,7 @@ class Sounds:
         return self.sounds[key]
 
 
-class Translator:
+class AudioBuilder:
     def __init__(self, *, languages, words_per_audio=10, sounds):
         def split_name_pair(name_pair):
             i = list(re.finditer(r'[A-Z]', language_pair))[1].span()[0]
@@ -215,20 +241,20 @@ class Translator:
         self.sounds = Sounds(sounds)
         self.streams = dict()
 
-        print('Indexing phrase examples...', end='', flush=True)
         self.samplers = dict()
         for language in app_config['phraseExamples']:
+            print(f'Indexing phrase examples for {language}...', end='', flush=True)
             self.samplers[language] = PhraseSampler(language)
-        print('done.')
+            print('done.')
 
     @staticmethod
-    def start_convert(language_pair, fn):
+    def _start_conversion_process(language_pair, fn):
         cmd_str = [
             *rf'ffmpeg -y -i audio/{language_pair}/audio{fn:03}.wav -codec:a libmp3lame -qscale:a 2 audio/{language_pair}/audio{fn:03}.mp3 && del audio\{language_pair}\audio{fn:03}.wav'.split(sep=' ')
         ]
         Popen(cmd_str, shell=True)
 
-    def get_engine(self, language_pair, fn):
+    def _get_engine(self, language_pair, fn):
         print(f'Creating track {language_pair} #{fn}...')
         engine = CreateObject("SAPI.SpVoice")
         stream = CreateObject("SAPI.SpFileStream")
@@ -245,18 +271,18 @@ class Translator:
         engine.AudioOutputStream = stream
         return engine, stream
 
-    def get_sample_phrase(self, foreign_name, word):
-        if foreign_name not in self.samplers:
+    def _search_excerpt(self, foreign_name, word):
+        if foreign_name not in self.samplers or ' ' in word:
             return None
-        example = self.samplers[foreign_name].get_sample_phrase(word)
+        example = self.samplers[foreign_name].get_excerpt(word)
         if example is None:
             # Try to find example for lemmatized form
             base_form = self.samplers[foreign_name].lemmatizer.lemmatize(word)
             if base_form != word:
-                example = self.samplers[foreign_name].get_sample_phrase(word)
+                example = self.samplers[foreign_name].get_excerpt(word)
         return example
 
-    def translate(self, source):
+    def make_audio_tracks(self, source):
         lines = source.lines()
 
         for language_pair, word, trans in lines:
@@ -269,7 +295,7 @@ class Translator:
             if language_pair in self.streams:
                 engine, stream = self.streams[language_pair]['engine'], self.streams[language_pair]['stream']
             else:
-                engine, stream = self.get_engine(language_pair, 0)
+                engine, stream = self._get_engine(language_pair, 0)
             count = self.streams[language_pair]['count']
 
             if count % self.words_per_audio == 0 and count > 0:
@@ -277,8 +303,8 @@ class Translator:
                 stream.Close()
                 track_num = count // self.words_per_audio
                 if track_num > 0:
-                    self.start_convert(language_pair, track_num - 1)  # Conversion and deletion in a separate process
-                engine, stream = self.get_engine(language_pair, track_num)
+                    self._start_conversion_process(language_pair, track_num - 1)  # Conversion and deletion in a separate process
+                engine, stream = self._get_engine(language_pair, track_num)
                 
             try:
                 # Say a phrase with both male and female narrators
@@ -297,7 +323,7 @@ class Translator:
                     
                     engine.SpeakStream(self.sounds['silence_long'])
 
-                    definitions, examples = self.samplers[foreign_name].get_definitions(word)
+                    definitions, examples = self.samplers[foreign_name].get_definitions_and_examples(word)
 
                     if definitions is not None:
                         for definition in definitions:
@@ -312,7 +338,7 @@ class Translator:
                     if examples is not None:
                         for example in examples:
                             engine.Volume = 50
-                            engine.SpeakStream(self.sounds['excerpt'])
+                            engine.SpeakStream(self.sounds['page_flipping'])
                             engine.SpeakStream(self.sounds['silence'])
 
                             engine.Rate = 0
@@ -321,18 +347,17 @@ class Translator:
                             engine.Speak(example)
                             engine.SpeakStream(self.sounds['silence_long'])
 
-                    if ' ' not in word:
-                        example = self.get_sample_phrase(foreign_name, word)
-                        if example is not None:
-                            engine.Volume = 50
-                            engine.SpeakStream(self.sounds['excerpt'])
-                            engine.SpeakStream(self.sounds['silence'])
+                    example = self._search_excerpt(foreign_name, word)
+                    if example is not None:
+                        engine.Volume = 50
+                        engine.SpeakStream(self.sounds['excerpt'])
+                        engine.SpeakStream(self.sounds['silence'])
 
-                            engine.Rate = 0
-                            engine.Volume = 100
-                            engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                            engine.Speak(example)
-                            engine.SpeakStream(self.sounds['silence_long'])
+                        engine.Rate = 0
+                        engine.Volume = 100
+                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        engine.Speak(example)
+                        engine.SpeakStream(self.sounds['silence_long'])
             except Exception as e:
                 print(f'{word} = {trans}: {str(e)}')
             else:
@@ -345,7 +370,7 @@ class Translator:
                 self.streams[language_pair]['stream'].Close()
                 print(f"{language_pair}: total {count} words")
                 track_num = count // self.words_per_audio
-                self.start_convert(language_pair, track_num)  # Conversion and deletion in a separate process
+                self._start_conversion_process(language_pair, track_num)  # Conversion and deletion in a separate process
 
 
 def get_source(file_path):
@@ -375,9 +400,9 @@ if __name__ == '__main__':
         exit(0)
 
     app_config = load(open('config.json'))
-    translator = Translator(languages=app_config['languages'],
-                            words_per_audio=app_config['words_per_audio'],
-                            sounds=app_config['sounds'])
+    audio_builder = AudioBuilder(languages=app_config['languages'],
+                                 words_per_audio=app_config['words_per_audio'],
+                                 sounds=app_config['sounds'])
     time_start = datetime.utcnow()
-    translator.translate(source=get_source(app_config['phrasebook']))
+    audio_builder.make_audio_tracks(source=get_source(app_config['phrasebook']))
     print(f'time taken: {(datetime.utcnow() - time_start).total_seconds()} sec.')
