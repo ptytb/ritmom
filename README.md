@@ -44,10 +44,12 @@ Corpuses are listed in a `phraseExamples` configuration option:
 
 ## TODO
 
-- [ ] Use more threads for TTS
+- [ ] Fix index before running tasks
 - [ ] Make a sequence configurable from a config
 - [ ] Fix wordnet for languages differ from English
 - [ ] Search for collocations
+- [X] Add synonyms and antonyms
+- [X] Use more threads for TTS
 - [X] Pickle indices for corpus for quicker start
 - [X] Add wordnet: definition (thesaurus, examples, excerpts)
 - [X] Update requirements.txt

@@ -1,6 +1,4 @@
 # coding: utf-8
-import traceback
-from itertools import islice
 from multiprocessing.pool import Pool
 
 from comtypes.client import CreateObject
@@ -33,19 +31,23 @@ import dill
 
 from os.path import exists
 
+from collections import namedtuple
+
 
 class PhraseSampler:
     """
     Provides definition, examples and excerpts.
     Excerpts are taken from corpuses listed by **phraseExamples** option.
     """
+
+    WordInfo = namedtuple('WordInfo', ['definitions', 'examples', 'synonyms', 'antonyms'])
+
     def __init__(self, language):
         corpus_names = app_config['phraseExamples'][language]
         self.lemmatizer = WordNetLemmatizer()
         self.language = language
 
         if exists(f'cache/{language}.idx'):
-            print('cache found, loading...', end='', flush=True)
             self._load_cache()
         else:
             self.texts = dict()
@@ -54,7 +56,6 @@ class PhraseSampler:
                 corpus = getattr(nltk.corpus, corpus_name)
                 text = self.texts[corpus_name] = nltk.Text(corpus.words())
                 self.indices[corpus_name] = ConcordanceIndex(text.tokens, key=lambda s: s.lower())
-            print('saving cache...', end='', flush=True)
             self._save_cache()
 
     def _load_cache(self):
@@ -121,13 +122,24 @@ class PhraseSampler:
             "japanese": "jpn",
         }
 
-        definitions, examples = None, None
-        synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
-        if synsets is not None:
-            synsets = [synset for synset in synsets if synset.name().split('.')[0] == word]
-            examples = [example for examples in [synset.examples() for synset in synsets] for example in examples]
-            definitions = [s.definition() for s in synsets]
-        return definitions, examples
+        def lemma_word(lemma_name):
+            return lemma_name.split('.')[0]
+
+        all_lemmas = wordnet.lemmas(word)
+        lemmas = [l for l in all_lemmas if repr(l)[7:].startswith(word)]
+        definitions = [l.synset().definition() for l in lemmas]
+        examples = [e for l in lemmas for e in l.synset().examples() if word in e]
+        antonyms = list({a.name() for l in lemmas for a in l.antonyms()})
+        synsets = [l.synset() for l in all_lemmas]
+        synonyms = list({lemma_word(s.name()) for s in synsets} - {word})
+
+        # synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
+        # if synsets is not None:
+        #     synsets = [synset for synset in synsets if synset.name().split('.')[0] == word]
+        #     examples = [example for examples in [synset.examples() for synset in synsets] for example in examples]
+        #     definitions = [s.definition() for s in synsets]
+
+        return self.WordInfo(definitions, examples, synonyms, antonyms)
 
 
 def unroll_multi_line_cell(gen_lines_func):
@@ -200,7 +212,7 @@ class CsvSource:
 
 class Sounds:
     @staticmethod
-    def write_silence(stream, sec):
+    def _write_silence(stream, sec):
         wf = stream.Format.GetWaveFormatEx()
         silence = (0, ) * int(sec * wf.SamplesPerSec * (wf.BitsPerSample // 8))
         stream.Write(silence)
@@ -212,28 +224,27 @@ class Sounds:
         return stream
 
     def __init__(self, config):
-        self.sounds = sounds = dict()
+        self._sounds = sounds = dict()
         for k, v in config.items():
             if v.startswith('silence'):
                 duration = float(v[v.find(' '):])
                 stream = CreateObject("SAPI.SpMemoryStream")
-                self.write_silence(stream, duration)
+                self._write_silence(stream, duration)
                 sounds[k] = stream
             else:
                 sounds[k] = self.load_wav(v)
 
     def __getitem__(self, key):
-        return self.sounds[key]
+        return self._sounds[key]
 
 
 class AudioBuilder:
-    def __init__(self, *, languages, words_per_audio=10, sounds):
+    def __init__(self, *, languages, sounds):
         def split_name_pair(name_pair):
             i = list(re.finditer(r'[A-Z]', language_pair))[1].span()[0]
             return name_pair[:i].lower(), name_pair[i:].lower()
 
         self.engine = CreateObject("SAPI.SpVoice")
-        self.words_per_audio = words_per_audio
         self.voices = dict()
 
         self.voices_com = voices = self.engine.GetVoices()
@@ -254,27 +265,21 @@ class AudioBuilder:
             assert all(map(has_voice, ['foreign1', 'foreign2', 'native']))
 
         self.sounds = Sounds(sounds)
-        self.streams = dict()
+        # self.streams = dict()
 
         self.samplers = dict()
         for language in app_config['phraseExamples']:
-            print(f'Indexing phrase examples for {language}...', end='', flush=True)
             self.samplers[language] = PhraseSampler(language)
-            print('done.')
 
     @staticmethod
     def _start_conversion_process(language_pair, fn):
         encode_queue.put((language_pair, fn))
 
-    def _get_engine(self, language_pair, fn):
+    @staticmethod
+    def _get_engine(language_pair, fn):
         print(f'Creating track {language_pair} #{fn}...')
         engine = CreateObject("SAPI.SpVoice")
         stream = CreateObject("SAPI.SpFileStream")
-        if language_pair not in self.streams:
-            self.streams[language_pair] = dict()
-            self.streams[language_pair]['count'] = 0
-        self.streams[language_pair]['engine'] = engine
-        self.streams[language_pair]['stream'] = stream
         try:
             mkdir(f'audio/{language_pair}')
         except OSError:
@@ -304,21 +309,6 @@ class AudioBuilder:
             native_name = self.voices[language_pair]['native_name']
             foreign_name = self.voices[language_pair]['foreign_name']
 
-            # if language_pair in self.streams:
-            #     engine, stream = self.streams[language_pair]['engine'], self.streams[language_pair]['stream']
-            # else:
-            #     engine, stream = self._get_engine(language_pair, 0)
-            # count = self.streams[language_pair]['count']
-
-            # if count % self.words_per_audio == 0 and count > 0:
-            #     # Start a new audio track file
-            #     engine.SpeakStream(self.sounds['end_of_part'])
-            #     stream.Close()
-            #     track_num = count // self.words_per_audio
-            #     if track_num > 0:
-            #         self._start_conversion_process(language_pair, track_num - 1)  # Conversion and deletion in a separate process
-            #     engine, stream = self._get_engine(language_pair, track_num)
-
             # Say a phrase with both male and female narrators
             for voice_num in range(1, 3):
                 engine.Rate = -6
@@ -339,29 +329,46 @@ class AudioBuilder:
                 if foreign_name not in self.samplers:
                     continue
 
-                definitions, examples = self.samplers[foreign_name].get_definitions_and_examples(word)
+                word_info = self.samplers[foreign_name].get_definitions_and_examples(word)
 
-                if definitions is not None:
-                    for definition in definitions:
-                        engine.Volume = 50
-                        engine.SpeakStream(self.sounds['definition'])
-                        engine.SpeakStream(self.sounds['silence'])
-                        engine.Volume = 100
-                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                        engine.Speak(definition + '.')
-                        engine.SpeakStream(self.sounds['silence_long'])
+                for definition in word_info.definitions:
+                    engine.Volume = 50
+                    engine.SpeakStream(self.sounds['definition'])
+                    engine.SpeakStream(self.sounds['silence'])
+                    engine.Volume = 100
+                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                    engine.Speak(definition + '.')
+                    engine.SpeakStream(self.sounds['silence_long'])
 
-                if examples is not None:
-                    for example in examples:
-                        engine.Volume = 50
-                        engine.SpeakStream(self.sounds['page_flipping'])
-                        engine.SpeakStream(self.sounds['silence'])
+                for example in word_info.examples:
+                    engine.Volume = 50
+                    engine.SpeakStream(self.sounds['page_flipping'])
+                    engine.SpeakStream(self.sounds['silence'])
+                    engine.Rate = 0
+                    engine.Volume = 100
+                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                    engine.Speak(example)
+                    engine.SpeakStream(self.sounds['silence_long'])
 
-                        engine.Rate = 0
-                        engine.Volume = 100
-                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                        engine.Speak(example)
-                        engine.SpeakStream(self.sounds['silence_long'])
+                for synonym in word_info.synonyms:
+                    engine.Volume = 50
+                    engine.SpeakStream(self.sounds['synonym'])
+                    engine.SpeakStream(self.sounds['silence'])
+                    engine.Rate = 0
+                    engine.Volume = 100
+                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                    engine.Speak(synonym)
+                    engine.SpeakStream(self.sounds['silence_long'])
+
+                for antonym in word_info.antonyms:
+                    engine.Volume = 50
+                    engine.SpeakStream(self.sounds['antonym'])
+                    engine.SpeakStream(self.sounds['silence'])
+                    engine.Rate = 0
+                    engine.Volume = 100
+                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                    engine.Speak(antonym)
+                    engine.SpeakStream(self.sounds['silence_long'])
 
                 excerpt = self._search_excerpt(foreign_name, word)
                 if excerpt is not None:
@@ -375,19 +382,8 @@ class AudioBuilder:
                     engine.Speak(excerpt)
                     engine.SpeakStream(self.sounds['silence_long'])
 
-            # self.streams[language_pair]['count'] += 1
-
-        self.streams[language_pair]['stream'].Close()
+        stream.Close()
         self._start_conversion_process(language_pair, track_num)
-
-        # # Close and convert last tracks
-        # for language_pair in self.streams:
-        #     count = self.streams[language_pair]['count']
-        #     if count % self.words_per_audio != 0:
-        #         self.streams[language_pair]['stream'].Close()
-        #         print(f"{language_pair}: total {count} words")
-        #         track_num = count // self.words_per_audio
-        #         self._start_conversion_process(language_pair, track_num)  # Conversion and deletion in a separate process
 
 
 class EncoderWorker(Process):
@@ -397,7 +393,10 @@ class EncoderWorker(Process):
 
     def run(self):
         while True:
-            language_pair, fn = self.queue.get()
+            value = self.queue.get()
+            if value is None:
+                break
+            language_pair, fn = value
             target_track_name = rf'audio/{language_pair}/audio{fn:03}.mp3'
             print(f'Encoding {target_track_name}')
             cmd_str = [
@@ -434,15 +433,14 @@ def list_engines():
         print(f'#{i} {desc}')
 
 
-def init_audio_builder(_encode_queue):
+def init_audio_builder(_encode_queue, _app_config):
     global audio_builder
     global app_config
     global encode_queue
-    app_config = load(open('config.json'))
-    audio_builder = AudioBuilder(languages=app_config['languages'],
-                                 words_per_audio=app_config['words_per_audio'],
-                                 sounds=app_config['sounds'])
+    app_config = _app_config
     encode_queue = _encode_queue
+    audio_builder = AudioBuilder(languages=app_config['languages'],
+                                 sounds=app_config['sounds'])
 
 
 def make_audio_track(language_pair, items, part_number):
@@ -468,23 +466,35 @@ if __name__ == '__main__':
     app_config = load(open('config.json'))
 
     phrasebook = get_source(app_config['phrasebook'])
-    with Pool(processes=cpu_count() - 1,
+    with Pool(processes=cpu_count() - 2,
               initializer=init_audio_builder,
-              initargs=(encode_queue,)) as pool:
+              initargs=(encode_queue, app_config)) as pool:
+        def process_chunk():
+            pool.apply_async(make_audio_track, (language_pair,
+                                                builder_queue.pop(language_pair),
+                                                builder_parts[language_pair]))
+            builder_queue[language_pair] = list()
+            builder_parts[language_pair] += 1
         builder_queue = dict()
         builder_parts = dict()
         for language_pair, word, trans in phrasebook.lines():
+            if language_pair not in app_config['languages']:
+                continue
             if language_pair not in builder_queue:
                 builder_queue[language_pair] = list()
                 builder_parts[language_pair] = 0
             builder_queue[language_pair].append((word, trans))
             if len(builder_queue[language_pair]) > app_config['words_per_audio']:
-                pool.apply_async(make_audio_track, (language_pair,
-                                                    builder_queue.pop(language_pair),
-                                                    builder_parts[language_pair]))
-                builder_queue[language_pair] = list()
-                builder_parts[language_pair] += 1
+                process_chunk()
+        for language_pair in builder_queue:
+            process_chunk()
+
         pool.close()
         pool.join()
+
+    encode_queue.put(None)
+    encode_worker.join()
+    encode_queue.close()
+    encode_queue.join_thread()
 
     print(f'time taken: {(datetime.utcnow() - time_start).total_seconds()} sec.')

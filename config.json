@@ -34,7 +34,9 @@
         "end_of_part": "sounds/ding.wav",
         "excerpt": "sounds/ripping-paper.wav",
         "definition": "sounds/C-E-G.wav",
-        "page_flipping": "sounds/page-flipping.wav"
+        "page_flipping": "sounds/page-flipping.wav",
+        "synonym": "sounds/C-G.wav",
+        "antonym": "sounds/C-D.wav"
     },
 
     "pattern": [
