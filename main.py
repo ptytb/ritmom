@@ -1,14 +1,20 @@
 # coding: utf-8
+
+import pickle
+# import dill
+
 from multiprocessing.pool import Pool
+from multiprocessing import Manager
+from multiprocessing import Process
+from subprocess import Popen, DEVNULL, STDOUT
+
+from traceback import print_exc
 
 from comtypes.client import CreateObject
-from multiprocessing import Queue, Process
 from win32com.client import Dispatch
 from comtypes.gen import SpeechLib
 
 from datetime import datetime
-
-from subprocess import Popen, DEVNULL, STDOUT
 
 from operator import contains
 from functools import partial
@@ -26,12 +32,74 @@ from nltk.stem import WordNetLemmatizer
 from nltk.text import ConcordanceIndex
 from nltk.corpus import wordnet
 
-import pickle
-import dill
-
 from os.path import exists
 
 from collections import namedtuple
+
+# dill.detect.trace(True)
+
+
+# class SharedLockable(type):
+#     @classmethod
+#     def set_lock(cls, lock):
+#         cls._lock = lock
+#
+#     @classmethod
+#     def get_lock(cls):
+#         return cls._lock
+#
+#     def __new__(cls, name, bases, attrs):
+#         if __name__ == '__main__':
+#             cls.set_lock(Lock())
+#         newattrs = {"get_lock": lambda: cls._lock}
+#         attrs.update(newattrs)
+#         klass = super().__new__(cls, name, bases, attrs)
+#         return klass
+
+
+class WordNetCache:
+    _lock = None
+
+    @classmethod
+    def get_lock(cls):
+        return cls._lock
+
+    def __init__(self):
+        self._byLanguage = dict()
+        self._lock = self.get_lock()
+
+    @staticmethod
+    def key_func(s):
+        return s.lower()
+
+    def get_cache(self, language):
+        if language not in self._byLanguage:
+            self._byLanguage[language] = dict()
+            self._byLanguage[language]['texts'] = dict()
+            self._byLanguage[language]['indices'] = dict()
+            with self.get_lock():
+                if exists(f'cache/{language}.ready'):
+                    self._load_cache(language)
+                else:
+                    corpus_names = app_config['phraseExamples'][language]
+                    for corpus_name in corpus_names:
+                        corpus = getattr(nltk.corpus, corpus_name)
+                        text = self._byLanguage[language]['texts'][corpus_name] = nltk.Text(corpus.words())
+                        self._byLanguage[language]['indices'][corpus_name] = ConcordanceIndex(text.tokens,
+                                                                                              key=self.key_func)
+                    self._save_cache(language)
+        texts, indices = self._byLanguage[language]['texts'], self._byLanguage[language]['indices']
+        return texts, indices
+
+    def _load_cache(self, language):
+        with open(f'cache/{language}.idx', 'rb') as f:
+            self._byLanguage[language] = pickle.load(f)
+
+    def _save_cache(self, language):
+        with open(f'cache/{language}.idx', 'wb') as f:
+            pickle.dump(self._byLanguage[language], f)
+        with open(f'cache/{language}.ready', 'wb') as f:
+            pass
 
 
 class PhraseSampler:
@@ -42,41 +110,18 @@ class PhraseSampler:
 
     WordInfo = namedtuple('WordInfo', ['definitions', 'examples', 'synonyms', 'antonyms'])
 
-    def __init__(self, language):
-        corpus_names = app_config['phraseExamples'][language]
+    def __init__(self):
         self.lemmatizer = WordNetLemmatizer()
-        self.language = language
+        self.word_net_cache = WordNetCache()
 
-        if exists(f'cache/{language}.idx'):
-            self._load_cache()
-        else:
-            self.texts = dict()
-            self.indices = dict()
-            for corpus_name in corpus_names:
-                corpus = getattr(nltk.corpus, corpus_name)
-                text = self.texts[corpus_name] = nltk.Text(corpus.words())
-                self.indices[corpus_name] = ConcordanceIndex(text.tokens, key=lambda s: s.lower())
-            self._save_cache()
-
-    def _load_cache(self):
-        with open(f'cache/{self.language}.t', 'rb') as f:
-            self.texts = dill.load(f)
-        with open(f'cache/{self.language}.idx', 'rb') as f:
-            self.indices = dill.load(f)
-
-    def _save_cache(self):
-        with open(f'cache/{self.language}.t', 'wb') as f:
-            dill.dump(self.texts, f)
-        with open(f'cache/{self.language}.idx', 'wb') as f:
-            dill.dump(self.indices, f)
-
-    def get_excerpt(self, word):
+    def get_excerpt(self, word, language):
         sentences = list()
         boundary_chars = ('.', ',', ':', '!', ';', '(', ')', '"', '、', '。', '\n')
+        texts, indices = self.word_net_cache.get_cache(language)
 
-        for corpus_name in self.indices:
-            index = self.indices[corpus_name]
-            text = self.texts[corpus_name]
+        for corpus_name in indices:
+            index = indices[corpus_name]
+            text = texts[corpus_name]
 
             for offset in index.offsets(word):
                 sentence_start = offset
@@ -93,7 +138,7 @@ class PhraseSampler:
 
                 sentence = text[sentence_start + 1:sentence_end]
                 if 3 < len(sentence) < 7:
-                    sentences.append(app_config['phraseJoinChar'][self.language].join(sentence) + '.')
+                    sentences.append(app_config['phraseJoinChar'][language].join(sentence) + '.')
 
         shortest_sentence = sorted(sentences, key=len, reverse=True)[0] if len(sentences) > 0 else None
         return shortest_sentence
@@ -110,7 +155,7 @@ class PhraseSampler:
         # print(', '.join(RadkDict())[u'明'])
         ...
 
-    def get_definitions_and_examples(self, word):
+    def get_definitions_and_examples(self, word, language):
         """
         Tries to find in synsets which have format "word.pos.N". We only search for exactly the same word
 
@@ -265,11 +310,7 @@ class AudioBuilder:
             assert all(map(has_voice, ['foreign1', 'foreign2', 'native']))
 
         self.sounds = Sounds(sounds)
-        # self.streams = dict()
-
-        self.samplers = dict()
-        for language in app_config['phraseExamples']:
-            self.samplers[language] = PhraseSampler(language)
+        self.sampler = PhraseSampler()
 
     @staticmethod
     def _start_conversion_process(language_pair, fn):
@@ -289,14 +330,14 @@ class AudioBuilder:
         return engine, stream
 
     def _search_excerpt(self, foreign_name, word):
-        if foreign_name not in self.samplers or ' ' in word:
+        if ' ' in word:
             return None
-        example = self.samplers[foreign_name].get_excerpt(word)
+        example = self.sampler.get_excerpt(word, foreign_name)
         if example is None:
             # Try to find example for lemmatized form
-            base_form = self.samplers[foreign_name].lemmatizer.lemmatize(word)
+            base_form = self.sampler.lemmatizer.lemmatize(word)
             if base_form != word:
-                example = self.samplers[foreign_name].get_excerpt(word)
+                example = self.sampler.get_excerpt(word, foreign_name)
         return example
 
     def make_audio_track(self, language_pair, lines, track_num):
@@ -326,10 +367,10 @@ class AudioBuilder:
                 engine.SpeakStream(self.sounds['silence_long'])
 
             for voice_num in range(1, 3):
-                if foreign_name not in self.samplers:
-                    continue
+                # if foreign_name not in self.sampler:
+                #     continue
 
-                word_info = self.samplers[foreign_name].get_definitions_and_examples(word)
+                word_info = self.sampler.get_definitions_and_examples(word, foreign_name)
 
                 for definition in word_info.definitions:
                     engine.Volume = 50
@@ -388,7 +429,7 @@ class AudioBuilder:
 
 class EncoderWorker(Process):
     def __init__(self, queue):
-        self.queue: Queue = queue
+        self.queue = queue
         super(EncoderWorker, self).__init__()
 
     def run(self):
@@ -433,22 +474,48 @@ def list_engines():
         print(f'#{i} {desc}')
 
 
-def init_audio_builder(_encode_queue, _app_config):
+def init_audio_builder(_encode_queue, _app_config, _lock):
+    """
+    This will initialize a worker process
+    :param _encode_queue:
+    :param _app_config:
+    :param _lock:
+    :return:
+    """
     global audio_builder
     global app_config
     global encode_queue
     app_config = _app_config
     encode_queue = _encode_queue
+    WordNetCache._lock = _lock
     audio_builder = AudioBuilder(languages=app_config['languages'],
                                  sounds=app_config['sounds'])
 
 
 def make_audio_track(language_pair, items, part_number):
+    """
+    This will be executed as payload from a worker process
+    :param language_pair:
+    :param items:
+    :param part_number:
+    :return:
+    """
     global audio_builder
-    audio_builder.make_audio_track(language_pair, items, part_number)
+    try:
+        audio_builder.make_audio_track(language_pair, items, part_number)
+    except Exception as e:
+        print(str(e))
+        print_exc()
 
 
 if __name__ == '__main__':
+    app_config = load(open('config.json'))
+
+    # WordNetCache._lock = Lock()
+    # c = WordNetCache()
+    # c.get_cache('english')
+    # exit(0)
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', help='List voice engines', action='store_true')
     args = parser.parse_args()
@@ -457,44 +524,45 @@ if __name__ == '__main__':
         list_engines()
         exit(0)
 
-    encode_queue = Queue()
-    encode_worker = EncoderWorker(encode_queue)
-    encode_worker.start()
+    with Manager() as multiprocessing_manager:
+        _lock = multiprocessing_manager.Lock()
 
-    time_start = datetime.utcnow()
+        encode_queue = multiprocessing_manager.Queue()
+        encode_worker = EncoderWorker(encode_queue)
+        encode_worker.start()
 
-    app_config = load(open('config.json'))
+        time_start = datetime.utcnow()
 
-    phrasebook = get_source(app_config['phrasebook'])
-    with Pool(processes=cpu_count() - 2,
-              initializer=init_audio_builder,
-              initargs=(encode_queue, app_config)) as pool:
-        def process_chunk():
-            pool.apply_async(make_audio_track, (language_pair,
-                                                builder_queue.pop(language_pair),
-                                                builder_parts[language_pair]))
-            builder_queue[language_pair] = list()
-            builder_parts[language_pair] += 1
-        builder_queue = dict()
-        builder_parts = dict()
-        for language_pair, word, trans in phrasebook.lines():
-            if language_pair not in app_config['languages']:
-                continue
-            if language_pair not in builder_queue:
+        phrasebook = get_source(app_config['phrasebook'])
+        with Pool(processes=cpu_count() - 2,
+                  initializer=init_audio_builder,
+                  initargs=(encode_queue, app_config, _lock)) as pool:
+            def process_chunk():
+                pool.apply_async(make_audio_track, (language_pair,
+                                                    builder_queue.pop(language_pair),
+                                                    builder_parts[language_pair]))
                 builder_queue[language_pair] = list()
-                builder_parts[language_pair] = 0
-            builder_queue[language_pair].append((word, trans))
-            if len(builder_queue[language_pair]) > app_config['words_per_audio']:
+                builder_parts[language_pair] += 1
+            builder_queue = dict()
+            builder_parts = dict()
+            for language_pair, word, trans in phrasebook.lines():
+                if language_pair not in app_config['languages']:
+                    continue
+                if language_pair not in builder_queue:
+                    builder_queue[language_pair] = list()
+                    builder_parts[language_pair] = 0
+                builder_queue[language_pair].append((word, trans))
+                if len(builder_queue[language_pair]) > app_config['words_per_audio']:
+                    process_chunk()
+            for language_pair in builder_queue:
                 process_chunk()
-        for language_pair in builder_queue:
-            process_chunk()
 
-        pool.close()
-        pool.join()
+            pool.close()
+            pool.join()
 
-    encode_queue.put(None)
-    encode_worker.join()
-    encode_queue.close()
-    encode_queue.join_thread()
+        encode_queue.put(None)
+        encode_worker.join()
+        encode_queue.close()
+        encode_queue.join_thread()
 
     print(f'time taken: {(datetime.utcnow() - time_start).total_seconds()} sec.')
