@@ -330,7 +330,7 @@ class AudioBuilder:
         return engine, stream
 
     def _search_excerpt(self, foreign_name, word):
-        if ' ' in word:
+        if ' ' in word or foreign_name not in app_config['phraseExamples']:
             return None
         example = self.sampler.get_excerpt(word, foreign_name)
         if example is None:
@@ -562,7 +562,7 @@ if __name__ == '__main__':
 
         encode_queue.put(None)
         encode_worker.join()
-        encode_queue.close()
-        encode_queue.join_thread()
+        # encode_queue.close()
+        # encode_queue.join_thread()
 
     print(f'time taken: {(datetime.utcnow() - time_start).total_seconds()} sec.')
