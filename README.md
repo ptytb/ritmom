@@ -44,9 +44,12 @@ Corpuses are listed in a `phraseExamples` configuration option:
 
 ## TODO
 
+- [ ] Arbitrary Text Source
+- [X] Generate text output too
 - [ ] Make a sequence configurable from a config
 - [ ] Fix wordnet for languages differ from English
 - [ ] Search for collocations
+- [ ] Download missing NLTK packages and corpuses automatically if missing
 - [X] Fix index before running tasks
 - [X] Add synonyms and antonyms
 - [X] Use more threads for TTS

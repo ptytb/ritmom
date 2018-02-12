@@ -1,5 +1,22 @@
 {
-    "words_per_audio": 100,
+    "words_per_audio": 10,
+
+    "generate_text": true,
+
+    "text_jingles": {
+        "silence": " ",
+        "silence_long": "\n",
+        "end_of_part": "\n***",
+        "excerpt": "\"",
+        "definition": "=",
+        "usage_example": ":",
+        "synonym": "~",
+        "antonym": "!"
+    },
+
+    "text_postprocessing": {
+        "japanese": ["furigana"]
+    },
 
     "phrasebook": "phrases/Phrasebook.csv",
 
@@ -9,22 +26,26 @@
         "EnglishRussian": {
             "foreign1": "Salli",
             "foreign2": "Brian",
-            "native": "Milena"
+            "native": "Milena",
+            "ignore": true
         },
         "RussianEnglish": {
           "foreign1": "Milena",
           "foreign2": "Milena",
-          "native": "Salli"
+          "native": "Salli",
+            "ignore": true
         },
         "JapaneseEnglish":{
             "foreign1": "Kyoko",
             "foreign2": "Misaki",
-            "native": "Salli"
+            "native": "Salli",
+            "ignore": false
         },
         "JapaneseRussian":{
           "foreign1": "Kyoko",
           "foreign2": "Misaki",
-          "native": "Milena"
+          "native": "Milena",
+          "ignore": true
         }
     },
 
@@ -34,13 +55,35 @@
         "end_of_part": "sounds/ding.wav",
         "excerpt": "sounds/ripping-paper.wav",
         "definition": "sounds/C-E-G.wav",
-        "page_flipping": "sounds/page-flipping.wav",
+        "usage_example": "sounds/page-flipping.wav",
         "synonym": "sounds/C-G.wav",
         "antonym": "sounds/C-D.wav"
     },
 
     "pattern": [
-        "foreign1", "silence", "foreign2", "silence", "silence_long", "example", "silence_long"
+        {"speak": "foreign1", "rate": -6, "volume": 100},
+        {"jingle": "silence"},
+
+        {"speak": "native", "rate": 0, "volume": 80},
+        {"jingle": "silence"},
+
+        {"jingle": "silence_long"},
+
+        {"speak": "foreign2", "rate": -6, "volume": 100},
+        {"jingle": "silence"},
+
+        {"speak": "native", "rate": 0, "volume": 80},
+        {"jingle": "silence"},
+
+        {"jingle": "silence_long"},
+
+        {"speak": "definitions", "rate": 0, "volume": 80},
+        {"speak": "examples", "rate": 0, "volume": 80},
+        {"speak": "synonyms", "rate": 0, "volume": 80},
+        {"speak": "antonyms", "rate": 0, "volume": 80},
+        {"speak": "excerpts", "rate": 0, "volume": 80},
+
+        {"jingle": "silence_long"}
     ],
 
     "phraseExamples": {

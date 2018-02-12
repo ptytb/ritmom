@@ -170,12 +170,19 @@ class PhraseSampler:
         def lemma_word(lemma_name):
             return lemma_name.split('.')[0]
 
-        all_lemmas = wordnet.lemmas(word)
-        lemmas = [l for l in all_lemmas if repr(l)[7:].startswith(word)]
-        definitions = [l.synset().definition() for l in lemmas]
-        examples = [e for l in lemmas for e in l.synset().examples() if word in e]
+        def lemma_name(lemma):
+            return repr(lemma)[7:]
+
+        all_lemmas = wordnet.lemmas(word, lang=language_nltk_naming[language])
+        if len(all_lemmas) == 0:
+            return None
+        word_en = word if language == 'english' else lemma_word(lemma_name(all_lemmas[0]))
+        lemmas = [l for l in all_lemmas if lemma_name(l).startswith(word_en)]  # skip 'Lemma('
+        # lemmas = [l for l in all_lemmas if l.name() == word]
+        synsets = [l.synset() for l in lemmas]
+        definitions = [s.definition() for s in synsets]
+        examples = [e for s in synsets for e in s.examples() if word in e]
         antonyms = list({a.name() for l in lemmas for a in l.antonyms()})
-        synsets = [l.synset() for l in all_lemmas]
         synonyms = list({lemma_word(s.name()) for s in synsets} - {word})
 
         # synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
@@ -283,6 +290,27 @@ class Sounds:
         return self._sounds[key]
 
 
+class TextBuilder:
+    def __init__(self, text_jingles):
+        self.extension = 'txt'
+        self.stream = None
+        self.text_jingles = text_jingles
+
+    def open(self, language_pair, track_num):
+        try:
+            mkdir(f'text/{language_pair}')
+        except OSError:
+            pass
+        file_name = f'text/{language_pair}/audio{track_num:03}.{self.extension}'
+        self.stream = open(file_name, mode='w', encoding='utf-8')
+
+    def speak(self, text):
+        print(text, file=self.stream, end='', sep='')
+
+    def speak_jingle(self, jingle_name):
+        print(self.text_jingles[jingle_name], file=self.stream, end='', sep='')
+
+
 class AudioBuilder:
     def __init__(self, *, languages, sounds):
         def split_name_pair(name_pair):
@@ -311,6 +339,8 @@ class AudioBuilder:
 
         self.sounds = Sounds(sounds)
         self.sampler = PhraseSampler()
+
+        self.text_builder = TextBuilder(app_config['text_jingles'])
 
     @staticmethod
     def _start_conversion_process(language_pair, fn):
@@ -342,6 +372,17 @@ class AudioBuilder:
 
     def make_audio_track(self, language_pair, lines, track_num):
         engine, stream = self._get_engine(language_pair, track_num)
+        self.text_builder.open(language_pair, track_num)
+
+        def speak(text):
+            engine.Speak(text)
+            if voice_num == 1:
+                self.text_builder.speak(text)
+
+        def speak_jingle(jingle_name):
+            engine.SpeakStream(self.sounds[jingle_name])
+            if voice_num == 1:
+                self.text_builder.speak_jingle(jingle_name)
 
         for word, trans in lines:
             if language_pair not in app_config['languages']:
@@ -355,73 +396,74 @@ class AudioBuilder:
                 engine.Rate = -6
                 engine.Volume = 100
                 engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                engine.Speak(f'{word}.')
+                speak(f'{word}.')
 
-                engine.SpeakStream(self.sounds['silence'])
+                speak_jingle('silence')
 
                 engine.Rate = 0
                 engine.Volume = 80
                 engine.Voice = self.voices_com.Item(self.voices[language_pair]['native'])
-                engine.Speak(f'{trans}.')
+                speak(f'{trans}.')
 
-                engine.SpeakStream(self.sounds['silence_long'])
+                speak_jingle('silence_long')
 
-            for voice_num in range(1, 3):
-                # if foreign_name not in self.sampler:
-                #     continue
+            word_info = self.sampler.get_definitions_and_examples(word, foreign_name)
+            if word_info:
+                for voice_num in range(1, 3):
+                    for definition in word_info.definitions:
+                        engine.Volume = 50
+                        speak_jingle('definition')
+                        speak_jingle('silence')
+                        engine.Volume = 100
+                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        speak(definition + '.')
+                        speak_jingle('silence_long')
 
-                word_info = self.sampler.get_definitions_and_examples(word, foreign_name)
+                    for example in word_info.examples:
+                        engine.Volume = 50
+                        speak_jingle('usage_example')
+                        speak_jingle('silence')
+                        engine.Rate = 0
+                        engine.Volume = 100
+                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        speak(example)
+                        speak_jingle('silence_long')
 
-                for definition in word_info.definitions:
-                    engine.Volume = 50
-                    engine.SpeakStream(self.sounds['definition'])
-                    engine.SpeakStream(self.sounds['silence'])
-                    engine.Volume = 100
-                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                    engine.Speak(definition + '.')
-                    engine.SpeakStream(self.sounds['silence_long'])
+                    for synonym in word_info.synonyms:
+                        engine.Volume = 50
+                        speak_jingle('synonym')
+                        speak_jingle('silence')
+                        engine.Rate = 0
+                        engine.Volume = 100
+                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        speak(synonym)
+                        speak_jingle('silence_long')
 
-                for example in word_info.examples:
-                    engine.Volume = 50
-                    engine.SpeakStream(self.sounds['page_flipping'])
-                    engine.SpeakStream(self.sounds['silence'])
-                    engine.Rate = 0
-                    engine.Volume = 100
-                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                    engine.Speak(example)
-                    engine.SpeakStream(self.sounds['silence_long'])
+                    for antonym in word_info.antonyms:
+                        engine.Volume = 50
+                        speak_jingle('antonym')
+                        speak_jingle('silence')
+                        engine.Rate = 0
+                        engine.Volume = 100
+                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        speak(antonym)
+                        speak_jingle('silence_long')
 
-                for synonym in word_info.synonyms:
-                    engine.Volume = 50
-                    engine.SpeakStream(self.sounds['synonym'])
-                    engine.SpeakStream(self.sounds['silence'])
-                    engine.Rate = 0
-                    engine.Volume = 100
-                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                    engine.Speak(synonym)
-                    engine.SpeakStream(self.sounds['silence_long'])
+                    excerpt = self._search_excerpt(foreign_name, word)
+                    if excerpt is not None:
+                        engine.Volume = 50
+                        speak_jingle('excerpt')
+                        speak_jingle('silence')
 
-                for antonym in word_info.antonyms:
-                    engine.Volume = 50
-                    engine.SpeakStream(self.sounds['antonym'])
-                    engine.SpeakStream(self.sounds['silence'])
-                    engine.Rate = 0
-                    engine.Volume = 100
-                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                    engine.Speak(antonym)
-                    engine.SpeakStream(self.sounds['silence_long'])
+                        engine.Rate = 0
+                        engine.Volume = 100
+                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        speak(excerpt)
+                        speak_jingle('silence_long')
 
-                excerpt = self._search_excerpt(foreign_name, word)
-                if excerpt is not None:
-                    engine.Volume = 50
-                    engine.SpeakStream(self.sounds['excerpt'])
-                    engine.SpeakStream(self.sounds['silence'])
-
-                    engine.Rate = 0
-                    engine.Volume = 100
-                    engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                    engine.Speak(excerpt)
-                    engine.SpeakStream(self.sounds['silence_long'])
+            voice_num = 1
+            speak_jingle('silence_long')
+            speak_jingle('silence_long')
 
         stream.Close()
         self._start_conversion_process(language_pair, track_num)
@@ -509,60 +551,68 @@ def make_audio_track(language_pair, items, part_number):
 
 
 if __name__ == '__main__':
-    app_config = load(open('config.json'))
+    def load_config():
+        config = load(open('config.json'))
+        languages = config['languages']
+        filtered_languages = dict()
+        for language, props in languages.items():
+            if 'ignore' not in props or not props['ignore']:
+                filtered_languages[language] = {prop: props[prop] for prop in props if prop != 'ignore'}
+        config['languages'] = filtered_languages
+        return config
 
-    # WordNetCache._lock = Lock()
-    # c = WordNetCache()
-    # c.get_cache('english')
-    # exit(0)
+    def main():
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-l', help='List voice engines', action='store_true')
+        args = parser.parse_args()
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-l', help='List voice engines', action='store_true')
-    args = parser.parse_args()
+        if args.l:
+            list_engines()
+            exit(0)
 
-    if args.l:
-        list_engines()
-        exit(0)
+        app_config = load_config()
 
-    with Manager() as multiprocessing_manager:
-        _lock = multiprocessing_manager.Lock()
+        with Manager() as multiprocessing_manager:
+            _lock = multiprocessing_manager.Lock()
 
-        encode_queue = multiprocessing_manager.Queue()
-        encode_worker = EncoderWorker(encode_queue)
-        encode_worker.start()
+            encode_queue = multiprocessing_manager.Queue()
+            encode_worker = EncoderWorker(encode_queue)
+            encode_worker.start()
 
-        time_start = datetime.utcnow()
+            time_start = datetime.utcnow()
 
-        phrasebook = get_source(app_config['phrasebook'])
-        with Pool(processes=cpu_count() - 2,
-                  initializer=init_audio_builder,
-                  initargs=(encode_queue, app_config, _lock)) as pool:
-            def process_chunk():
-                pool.apply_async(make_audio_track, (language_pair,
-                                                    builder_queue.pop(language_pair),
-                                                    builder_parts[language_pair]))
-                builder_queue[language_pair] = list()
-                builder_parts[language_pair] += 1
-            builder_queue = dict()
-            builder_parts = dict()
-            for language_pair, word, trans in phrasebook.lines():
-                if language_pair not in app_config['languages']:
-                    continue
-                if language_pair not in builder_queue:
+            phrasebook = get_source(app_config['phrasebook'])
+            with Pool(processes=cpu_count() - 2,
+                      initializer=init_audio_builder,
+                      initargs=(encode_queue, app_config, _lock)) as pool:
+                def process_chunk():
+                    pool.apply_async(make_audio_track, (language_pair,
+                                                        builder_queue.pop(language_pair),
+                                                        builder_parts[language_pair]))
                     builder_queue[language_pair] = list()
-                    builder_parts[language_pair] = 0
-                builder_queue[language_pair].append((word, trans))
-                if len(builder_queue[language_pair]) > app_config['words_per_audio']:
+                    builder_parts[language_pair] += 1
+                builder_queue = dict()
+                builder_parts = dict()
+                for language_pair, word, trans in phrasebook.lines():
+                    if language_pair not in app_config['languages']:
+                        continue
+                    if language_pair not in builder_queue:
+                        builder_queue[language_pair] = list()
+                        builder_parts[language_pair] = 0
+                    builder_queue[language_pair].append((word, trans))
+                    if len(builder_queue[language_pair]) > app_config['words_per_audio']:
+                        process_chunk()
+                for language_pair in builder_queue:
                     process_chunk()
-            for language_pair in builder_queue:
-                process_chunk()
 
-            pool.close()
-            pool.join()
+                pool.close()
+                pool.join()
 
-        encode_queue.put(None)
-        encode_worker.join()
-        # encode_queue.close()
-        # encode_queue.join_thread()
+            encode_queue.put(None)
+            encode_worker.join()
+            # encode_queue.close()
+            # encode_queue.join_thread()
 
-    print(f'time taken: {(datetime.utcnow() - time_start).total_seconds()} sec.')
+        print(f'time taken: {(datetime.utcnow() - time_start).total_seconds()} sec.')
+
+    main()
