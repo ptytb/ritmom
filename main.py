@@ -7,6 +7,7 @@ from multiprocessing.pool import Pool
 from multiprocessing import Manager
 from multiprocessing import Process
 from subprocess import Popen, DEVNULL, STDOUT
+from sys import modules
 
 from traceback import print_exc
 
@@ -35,6 +36,8 @@ from nltk.corpus import wordnet
 from os.path import exists
 
 from collections import namedtuple
+
+from postprocessing import *
 
 # dill.detect.trace(True)
 
@@ -142,18 +145,6 @@ class PhraseSampler:
 
         shortest_sentence = sorted(sentences, key=len, reverse=True)[0] if len(sentences) > 0 else None
         return shortest_sentence
-
-    def get_definitions_jpn_experiments(self):
-        # synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
-        # jaconv.hira2kata(u'ともえまみ', STDOUT)
-
-        # analyzer = ASA(r'd:\prog\ASA\ASA20170503.jar')
-        # analyzer.parse('彼は村長だ')
-
-        # os.environ['CJKDATA'] = r'D:\Src\Lang\Nihon\cjkdata\cjkdata'
-        # from cjktools.resources.radkdict import RadkDict
-        # print(', '.join(RadkDict())[u'明'])
-        ...
 
     def get_definitions_and_examples(self, word, language):
         """
@@ -292,9 +283,11 @@ class Sounds:
 
 class TextBuilder:
     def __init__(self, text_jingles):
+        global app_config
         self.extension = 'txt'
         self.stream = None
         self.text_jingles = text_jingles
+        self.postprocessing = app_config['postprocessing']
 
     def open(self, language_pair, track_num):
         try:
@@ -303,6 +296,16 @@ class TextBuilder:
             pass
         file_name = f'text/{language_pair}/audio{track_num:03}.{self.extension}'
         self.stream = open(file_name, mode='w', encoding='utf-8')
+
+    def speak_postprocess(self, text, language_pair):
+        processed_text = text
+        for language in self.postprocessing:
+            if language_pair.lower().startswith(language):
+                module_list = self.postprocessing[language]
+        for module in module_list:
+            if module.startswith('text') and module_list[module]:
+                processed_text = modules[f'postprocessing.{module}'].process(text)
+                print(processed_text, file=self.stream, sep='')
 
     def speak(self, text):
         print(text, file=self.stream, end='', sep='')
@@ -379,6 +382,10 @@ class AudioBuilder:
             if voice_num == 1:
                 self.text_builder.speak(text)
 
+        def speak_postprocess(text):
+            if voice_num == 1:
+                self.text_builder.speak_postprocess(text, language_pair)
+
         def speak_jingle(jingle_name):
             engine.SpeakStream(self.sounds[jingle_name])
             if voice_num == 1:
@@ -406,6 +413,8 @@ class AudioBuilder:
                 speak(f'{trans}.')
 
                 speak_jingle('silence_long')
+
+                speak_postprocess(word)
 
             word_info = self.sampler.get_definitions_and_examples(word, foreign_name)
             if word_info:
@@ -466,13 +475,14 @@ class AudioBuilder:
             speak_jingle('silence_long')
 
         stream.Close()
-        self._start_conversion_process(language_pair, track_num)
+        if not only_wav:
+            self._start_conversion_process(language_pair, track_num)
 
 
-class EncoderWorker(Process):
+class AudioEncoderWorker(Process):
     def __init__(self, queue):
         self.queue = queue
-        super(EncoderWorker, self).__init__()
+        super(AudioEncoderWorker, self).__init__()
 
     def run(self):
         while True:
@@ -516,7 +526,7 @@ def list_engines():
         print(f'#{i} {desc}')
 
 
-def init_audio_builder(_encode_queue, _app_config, _lock):
+def init_audio_builder(_encode_queue, _app_config, _lock, _only_wav):
     """
     This will initialize a worker process
     :param _encode_queue:
@@ -527,9 +537,11 @@ def init_audio_builder(_encode_queue, _app_config, _lock):
     global audio_builder
     global app_config
     global encode_queue
+    global only_wav
     app_config = _app_config
     encode_queue = _encode_queue
     WordNetCache._lock = _lock
+    only_wav = _only_wav
     audio_builder = AudioBuilder(languages=app_config['languages'],
                                  sounds=app_config['sounds'])
 
@@ -564,6 +576,7 @@ if __name__ == '__main__':
     def main():
         parser = argparse.ArgumentParser()
         parser.add_argument('-l', help='List voice engines', action='store_true')
+        parser.add_argument('-w', help='Write WAV only, skip conversion to MP3', action='store_true')
         args = parser.parse_args()
 
         if args.l:
@@ -576,7 +589,7 @@ if __name__ == '__main__':
             _lock = multiprocessing_manager.Lock()
 
             encode_queue = multiprocessing_manager.Queue()
-            encode_worker = EncoderWorker(encode_queue)
+            encode_worker = AudioEncoderWorker(encode_queue)
             encode_worker.start()
 
             time_start = datetime.utcnow()
@@ -584,7 +597,7 @@ if __name__ == '__main__':
             phrasebook = get_source(app_config['phrasebook'])
             with Pool(processes=cpu_count() - 2,
                       initializer=init_audio_builder,
-                      initargs=(encode_queue, app_config, _lock)) as pool:
+                      initargs=(encode_queue, app_config, _lock, args.w)) as pool:
                 def process_chunk():
                     pool.apply_async(make_audio_track, (language_pair,
                                                         builder_queue.pop(language_pair),

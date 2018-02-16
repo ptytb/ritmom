@@ -1,3 +1,4 @@
 ﻿/audio/*
 /phrases/*
 .idea/*
+__pycache__

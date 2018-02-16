@@ -14,8 +14,12 @@
         "antonym": "!"
     },
 
-    "text_postprocessing": {
-        "japanese": ["furigana"]
+    "postprocessing": {
+        "japanese": {
+            "text_output_furigana": true,
+            "text_explain_kanji": true,
+            "text_explain_sentence_parts": true
+        }
     },
 
     "phrasebook": "phrases/Phrasebook.csv",
