@@ -1,7 +1,6 @@
 # coding: utf-8
 
 import pickle
-# import dill
 
 from multiprocessing.pool import Pool
 from multiprocessing import Manager
@@ -38,6 +37,7 @@ from os.path import exists
 from collections import namedtuple
 
 from postprocessing import *
+from postprocessing.lang_jp_reverse import jp_reverse
 
 # dill.detect.trace(True)
 
@@ -445,6 +445,8 @@ class AudioBuilder:
                         engine.Rate = 0
                         engine.Volume = 100
                         engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        if foreign_name == 'japanese':
+                            synonym = jp_reverse(synonym)
                         speak(synonym)
                         speak_jingle('silence_long')
 
@@ -455,6 +457,8 @@ class AudioBuilder:
                         engine.Rate = 0
                         engine.Volume = 100
                         engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        if foreign_name == 'japanese':
+                            antonym = jp_reverse(antonym)
                         speak(antonym)
                         speak_jingle('silence_long')
 
@@ -469,6 +473,8 @@ class AudioBuilder:
                         engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
                         speak(excerpt)
                         speak_jingle('silence_long')
+
+                        speak_postprocess(excerpt)
 
             voice_num = 1
             speak_jingle('silence_long')
