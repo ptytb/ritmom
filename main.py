@@ -298,7 +298,6 @@ class TextBuilder:
         self.stream = open(file_name, mode='w', encoding='utf-8')
 
     def speak_postprocess(self, text, language_pair):
-        processed_text = text
         for language in self.postprocessing:
             if language_pair.lower().startswith(language):
                 module_list = self.postprocessing[language]
