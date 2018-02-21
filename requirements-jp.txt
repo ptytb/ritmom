@@ -1,4 +1,4 @@
-cihai=0.7.4
-rakutenma=0.3.3
-jaconv=0.2.1
-furigana=0.2
+cihai==0.7.4
+rakutenma==0.3.3
+jaconv==0.2.1
+furigana==0.2
