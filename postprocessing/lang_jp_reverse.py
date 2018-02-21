@@ -1,4 +1,3 @@
-import jaconv
 import sys
 sys.__stdout__ = sys.stdout
 from cihai.core import Cihai

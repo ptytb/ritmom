@@ -46,6 +46,8 @@ Corpuses are listed in a `phraseExamples` configuration option:
 
 For furigana support you'll need [MeCab](https://doc-0s-9o-docs.googleusercontent.com/docs/securesc/bfpns3k4jmfq4rerbchsjt9tvab2g2to/s1rba84ju4ebrtpunekt5uqhrcss5uuo/1518775200000/13553212398903315502/07793478864651846602/0B4y35FiV1wh7WElGUGt6ejlpVXc?e=download&nonce=vrph5sdvr9aks&user=07793478864651846602&hash=km3beiek9q72uomsoljre155mj7m4kkk) executable accessible in your PATH.
 
+You'll need to install the requirements `pip install -r requirements-jp.txt`
+
 ## TODO
 
 - [ ] Arbitrary Text Source
