@@ -38,6 +38,13 @@ from collections import namedtuple
 
 from postprocessing import *
 from postprocessing.lang_jp_reverse import jp_reverse
+from enum import IntEnum
+
+
+class SpeechStreamSeekPositionType(IntEnum):
+    SSSPTRelativeToStart = 0
+    SSSPTRelativeToCurrentPosition = 1
+    SSSPTRelativeToEnd = 2
 
 # dill.detect.trace(True)
 
@@ -385,7 +392,16 @@ class AudioBuilder:
             if voice_num == 1:
                 self.text_builder.speak_postprocess(text, language_pair)
 
+        wf = stream.Format.GetWaveFormatEx()
+        stream_position_divider = int(wf.SamplesPerSec * (wf.BitsPerSample // 8))
+
         def speak_jingle(jingle_name):
+            if jingle_name == 'timestamp':
+                stream_position_bytes = stream.Seek(0, SpeechStreamSeekPositionType.SSSPTRelativeToCurrentPosition)
+                stream_position_seconds = stream_position_bytes // stream_position_divider
+                t = datetime.utcfromtimestamp(stream_position_seconds)
+                self.text_builder.speak(f'{t.strftime("%H:%M:%S")}\n')
+                return
             engine.SpeakStream(self.sounds[jingle_name])
             if voice_num == 1:
                 self.text_builder.speak_jingle(jingle_name)
@@ -396,6 +412,8 @@ class AudioBuilder:
 
             native_name = self.voices[language_pair]['native_name']
             foreign_name = self.voices[language_pair]['foreign_name']
+
+            speak_jingle('timestamp')
 
             # Say a phrase with both male and female narrators
             for voice_num in range(1, 3):

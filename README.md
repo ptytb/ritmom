@@ -50,6 +50,7 @@ You'll need to install the requirements `pip install -r requirements-jp.txt`
 
 ## TODO
 
+- [ ] Text: write approximate audio timestamp
 - [ ] Arbitrary Text Source
 - [X] Generate text output too
 - [ ] Make a sequence configurable from a config
