@@ -1,3 +1,0 @@
-[submodule "deps/jp_wordnet"]
-	path = deps/jp_wordnet
-	url = https://github.com/smurakami/jp_wordnet
