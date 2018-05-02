@@ -3,6 +3,10 @@
 
     "generate_text": true,
 
+    "text_encoding": {
+      "JapaneseEnglish": ""
+    },
+
     "text_jingles": {
         "silence": " ",
         "silence_long": "\n",
@@ -25,7 +29,10 @@
         }
     },
 
-    "phrasebook": "phrases/Phrasebook.csv",
+    "phrasebooks": [
+      "phrases/Phrasebook.csv",
+      "phrases/Phrasebook.xlsm"
+    ],
 
     "default": "EnglishRussian",
 
@@ -34,7 +41,7 @@
             "foreign1": "Salli",
             "foreign2": "Brian",
             "native": "Milena",
-            "ignore": true
+            "ignore": false
         },
         "RussianEnglish": {
           "foreign1": "Milena",

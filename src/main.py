@@ -1,5 +1,7 @@
 # coding: utf-8
 
+from itertools import chain
+
 from multiprocessing.pool import Pool
 from multiprocessing import Manager
 
@@ -24,6 +26,8 @@ from pathtools.path import parent_dir_path
 
 from source.csv import CsvSource
 from source.excel import ExcelSource
+
+from src.source.util import UnrollMultilineCell
 
 
 def get_source(file_path):
@@ -104,6 +108,13 @@ if __name__ == '__main__':
         app_config = load_config()
         app_config['RitmomRoot'] = ritmom_root
 
+        phrasebooks = [
+            UnrollMultilineCell(default_language=app_config['default'])(
+                next(get_source(f"{app_config['RitmomRoot']}/{book}")))
+            for book in app_config['phrasebooks']
+        ]
+        phrasebook = chain(*phrasebooks)
+
         with Manager() as multiprocessing_manager:
             _lock = multiprocessing_manager.Lock()
 
@@ -111,7 +122,6 @@ if __name__ == '__main__':
             encode_worker = AudioEncoderWorker(encode_queue, app_config)
             encode_worker.start()
 
-            phrasebook = get_source(f"{app_config['RitmomRoot']}/{app_config['phrasebook']}")
             with Pool(processes=cpu_count() - 2,
                       initializer=init_audio_builder,
                       initargs=(encode_queue, app_config, _lock, args.w)) as pool:
@@ -123,10 +133,11 @@ if __name__ == '__main__':
                     pool.apply_async(make_audio_track, (language_pair,
                                                         builder_queue.pop(language_pair),
                                                         builder_parts[language_pair]))
+
                     builder_queue[language_pair] = list()
                     builder_parts[language_pair] += 1
 
-                for language_pair, word, trans in phrasebook.lines():
+                for language_pair, word, trans in phrasebook:
                     if language_pair not in app_config['languages']:
                         continue
                     if language_pair not in builder_queue:
