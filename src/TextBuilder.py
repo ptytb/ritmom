@@ -17,7 +17,8 @@ class TextBuilder:
         except OSError:
             pass
         file_name = f'{self.app_config["RitmomRoot"]}/text/{language_pair}/audio{track_num:03}.{self.extension}'
-        self.stream = open(file_name, mode='w', encoding='utf-8')
+        encoding = self.app_config['text_encoding'][language_pair] or 'urf-8'
+        self.stream = open(file_name, mode='w', encoding=encoding, errors='ignore')
 
     def speak_with_postprocess(self, text, language_pair):
         module_list = list()
