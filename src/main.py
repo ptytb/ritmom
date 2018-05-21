@@ -26,8 +26,9 @@ from pathtools.path import parent_dir_path
 
 from source.csv import CsvSource
 from source.excel import ExcelSource
+from source.text import TextSource
 
-from src.source.util import UnrollMultilineCell
+from source.util import UnrollMultilineCell
 
 
 def get_source(file_path):
@@ -35,6 +36,8 @@ def get_source(file_path):
         return ExcelSource(file_path)
     elif re.search(r'\.csv$', file_path):
         return CsvSource(file_path)
+    elif re.search(r'\.txt$', file_path):
+        return TextSource(file_path)
     else:
         raise Exception(f'Type of source "{file_path}" is undetermined')
 
@@ -111,7 +114,7 @@ if __name__ == '__main__':
         phrasebooks = [
             UnrollMultilineCell(default_language=app_config['default'])(
                 next(get_source(f"{app_config['RitmomRoot']}/{book}")))
-            for book in app_config['phrasebooks']
+            for book in app_config['phrasebooks'] if not book.startswith('#')
         ]
         phrasebook = chain(*phrasebooks)
 
