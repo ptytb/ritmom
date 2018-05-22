@@ -132,9 +132,9 @@ class AudioBuilder:
                 engine.Rate = 0
                 engine.Volume = 80
                 engine.Voice = self.voices_com.Item(self.voices[language_pair]['native'])
-                speak(f'{trans}.')
-
-                speak_jingle('silence_long')
+                if trans:
+                    speak(f'{trans}.')
+                    speak_jingle('silence_long')
 
                 speak_postprocess(word)
 

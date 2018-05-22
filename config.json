@@ -29,10 +29,11 @@
             "text_filter_apostrophe": true
         }
     },
-
+	
+	"_comment": "Paths with leading # are ignored",
     "phrasebooks": [
-      "phrases/Phrasebook.csv",
-      "phrases/Phrasebook.xlsm",
+      "#phrases/Phrasebook.csv",
+      "#phrases/Phrasebook.xlsm",
       "phrases/Phrasebook.txt"
     ],
 
