@@ -78,10 +78,12 @@ class AudioBuilder:
             return None
         example = self.sampler.get_excerpt(word, foreign_name)
         if example is None:
-            # Try to find example for lemmatized form
-            base_form = self.sampler.lemmatizer.lemmatize(word)
-            if base_form != word:
-                example = self.sampler.get_excerpt(word, foreign_name)
+            # Try to find an example for lemmatized (stemmed) form
+            base_forms = self.sampler.lemmatize(word)
+            for base_form in base_forms:
+                example = self.sampler.get_excerpt(base_form, foreign_name)
+                if example:
+                    break
         return example
 
     def make_audio_track(self, language_pair, lines, track_num):

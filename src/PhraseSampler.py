@@ -1,9 +1,10 @@
 from collections.__init__ import namedtuple
 
-from nltk import WordNetLemmatizer
+from nltk import WordNetLemmatizer, PorterStemmer
 from nltk.corpus import wordnet
 
 from WordNetCache import WordNetCache
+from word_forms.word_forms import get_word_forms
 
 
 class PhraseSampler:
@@ -16,12 +17,25 @@ class PhraseSampler:
 
     def __init__(self, app_config):
         self.app_config = app_config
-        self.lemmatizer = WordNetLemmatizer()
+        self.lemmatizers = [WordNetLemmatizer()]
         self.word_net_cache = WordNetCache(app_config)
+
+    def lemmatize(self, word):
+        for lemmatizer in self.lemmatizers:
+            base_form = lemmatizer.lemmatize(word)
+            if word != base_form and base_form is not None:
+                return {base_form}
+        word_forms = get_word_forms(word)
+        all_forms = set()
+        for base_forms_pos in word_forms:
+            for base_form in word_forms[base_forms_pos]:
+                if base_form != word:
+                    all_forms.add(base_form)
+        return all_forms
 
     def get_excerpt(self, word, language):
         sentences = list()
-        boundary_chars = ('.', ',', ':', '!', ';', '(', ')', '"', '、', '。', '\n')
+        boundary_chars = ('?', '.', ',', ':', '!', ';', '(', ')', '"', '、', '。', '\n')
         texts, indices = self.word_net_cache.get_cache(language)
 
         for corpus_name in indices:
@@ -30,19 +44,19 @@ class PhraseSampler:
 
             for offset in index.offsets(word):
                 sentence_start = offset
-                boundary_limit = 5
+                boundary_limit = 8
                 while text[sentence_start] not in boundary_chars and sentence_start > 0 and boundary_limit > 0:
                     sentence_start -= 1
                     boundary_limit -= 1
 
                 sentence_end = offset
-                boundary_limit = 5
+                boundary_limit = 8
                 while text[sentence_end] not in boundary_chars and sentence_end < len(text) and boundary_limit > 0:
                     sentence_end += 1
                     boundary_limit -= 1
 
                 sentence = text[sentence_start + 1:sentence_end]
-                if 3 < len(sentence) < 7:
+                if len(sentence) > 1:
                     sentences.append(self.app_config['phraseJoinChar'][language].join(sentence) + '.')
 
         shortest_sentence = sorted(sentences, key=len, reverse=True)[0] if len(sentences) > 0 else None

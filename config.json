@@ -104,7 +104,7 @@
     ],
 
     "phraseExamples": {
-        "english": ["brown", "gutenberg"],
+        "english": ["brown", "gutenberg", "nps_chat", "webtext", "reuters", "genesis"],
         "japanese": ["knbc", "jeita"]
     },
 
