@@ -2,3 +2,4 @@
 /phrases/*
 .idea/*
 __pycache__
+.cache
