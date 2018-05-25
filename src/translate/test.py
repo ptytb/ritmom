@@ -12,6 +12,7 @@ class TestDictionaryReaders(unittest.TestCase):
             self.assertIn(header, dsl.dictionary_header)
 
         self.assertRegex(dsl.translate_word("'cellist"), r'виолончелист')
+        self.assertRegex(dsl.translate_word("clobber"), r'тряпьё')
 
 
 if __name__ == '__main__':

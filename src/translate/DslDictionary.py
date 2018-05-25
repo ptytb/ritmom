@@ -5,11 +5,10 @@ import gzip
 import re
 import pickle
 from os.path import exists
-import io
 
 
 # Print iterations progress
-def print_progressbar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█'):
+def print_progressbar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█'):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -101,10 +100,21 @@ class DslDictionary(Translator):
             self.dictionary_header = cache["dictionary_header"]
         return cache_exists
 
+    @staticmethod
+    def _filter_formatting(record):
+        dropout_tags = ['b', 'com', r'\*']
+        for tag in dropout_tags:
+            record = re.sub(rf'\[{tag}\].*?\[/{tag}\]', '', record)
+        record = re.sub(r'\d+[.)]\s*', '', record)  # numbered lists
+        record = re.sub(rf'\\\[.*?\\\]', '', record)  # transcriptions
+        record = re.sub(rf'\[.*?\]', '', record)  # tagged markup
+        record = re.sub(rf'\s*\(\s*\)\s*', '', record)  # empty brackets
+        return record.strip()
+
     def translate_word(self, word):
         try:
             items = self.dictionary[word]
         except KeyError:
             return None
 
-        return ';'.join(items)
+        return self._filter_formatting(' '.join(items))
