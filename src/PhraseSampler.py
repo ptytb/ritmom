@@ -82,16 +82,18 @@ class PhraseSampler:
             return repr(lemma)[7:]
 
         all_lemmas = wordnet.lemmas(word, lang=language_nltk_naming[language])
-        if len(all_lemmas) == 0:
-            return None
-        word_en = word if language == 'english' else lemma_word(lemma_name(all_lemmas[0]))
-        lemmas = [l for l in all_lemmas if lemma_name(l).startswith(word_en)]  # skip 'Lemma('
-        # lemmas = [l for l in all_lemmas if l.name() == word]
-        synsets = [l.synset() for l in lemmas]
-        definitions = [s.definition() for s in synsets]
-        examples = [e for s in synsets for e in s.examples() if word in e]
-        antonyms = list({a.name() for l in lemmas for a in l.antonyms()})
-        synonyms = list({lemma_word(s.name()) for s in synsets} - {word})
+        if len(all_lemmas) > 0:
+            word_en = word if language == 'english' else lemma_word(lemma_name(all_lemmas[0]))
+            lemmas = [l for l in all_lemmas if lemma_name(l).startswith(word_en)]  # skip 'Lemma('
+            # lemmas = [l for l in all_lemmas if l.name() == word]
+            synsets = [l.synset() for l in lemmas]
+            definitions = [s.definition() for s in synsets]
+            examples = [e for s in synsets for e in s.examples() if word in e]
+            antonyms = list({a.name() for l in lemmas for a in l.antonyms()})
+            synonyms = list({lemma_word(s.name()) for s in synsets} - {word})
+        else:
+            # definitions, examples, synonyms, antonyms = (list(),) * 4
+            definitions, examples, synonyms, antonyms = [], [], [], []
 
         # synsets = wordnet.synsets(word, lang=language_nltk_naming[self.language])
         # if synsets is not None:
