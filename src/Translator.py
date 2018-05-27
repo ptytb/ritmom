@@ -1,13 +1,14 @@
 from src.translate.Dictionary import Dictionary
+from src.utils.singleton import Singleton
 
 
-class Translator:
+class Translator(metaclass=Singleton):
 
-    @classmethod
-    def __new__(cls, *args, **kwargs):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(Translator, cls).__new__(cls)
-        return cls.instance
+    # @classmethod
+    # def __new__(cls, *args, **kwargs):
+    #     if not hasattr(cls, 'instance'):
+    #         cls.instance = super(Translator, cls).__new__(cls)
+    #     return cls.instance
 
     def __init__(self, dict_descriptors):
         if dict_descriptors is None:

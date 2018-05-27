@@ -5,8 +5,7 @@ RITMOM - Repetition is the mother of memory.
 It's for learning languages. Creates audio tracks from:
 
 - Your **Google Translate favorites** list. Feeds word and phrase pairs from.
-- Plain text file with foreign word list. Offline dictionaries are used for translation.
-
+- Plain text file with foreign word list. Offline dictionaries are used for translation (WordNet, GoldenDict, Lingoes).
 
 The idea is to use a sequence
 
@@ -57,9 +56,11 @@ Supported dictionary formats:
 
 - DSL (Used by [GoldenDict](https://goldendict.org/))
 - LDX (Used by [ABBYY Lingvo]() and [Lingoes](https://www.lingoes.net))
+- WordNet (through NLTK)
 
 ## TODO
 
+- [ ] Add subtitle (.srt) corpus reader and examples
 - [ ] Do try fuzzy matching if no translation found
 - [X] Text: write approximate audio timestamp
 - [ ] Arbitrary Text Source

@@ -30,6 +30,13 @@ class TestDictionaryReaders(unittest.TestCase):
         self.assertRegex(dsl.translate_word("clobber"), r'колошматить')
         self.assertRegex(dsl.translate_word("fie"), r'фу')
 
+        dsl = LdxDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx',
+                            'utf-8',
+                            self.cache_dir)
+
+        self.assertEqual(dsl.dictionary_header['type'], 'LDX')
+        self.assertRegex(dsl.translate_word('nana'), 'grandmother')
+
 
 if __name__ == '__main__':
     unittest.main()

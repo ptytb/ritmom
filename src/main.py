@@ -30,7 +30,8 @@ if __name__ == '__main__':
     from src.Translator import Translator
 
 
-def get_source(file_path):
+def get_source(file_path, root):
+    file_path = f"{root}/{file_path}"
     if re.search(r'\.xls(m)?$', file_path):
         return ExcelSource(file_path)
     elif re.search(r'\.csv$', file_path):
@@ -109,13 +110,24 @@ if __name__ == '__main__':
         app_config = load_config()
         app_config['RitmomRoot'] = ritmom_root
 
-        translator = Translator(app_config['dictionaries'])
+        Translator(app_config['dictionaries'])
 
-        phrasebooks = [
-            UnrollMultilineCell(default_language=app_config['default'])(
-                next(get_source(f"{app_config['RitmomRoot']}/{book}")))
-            for book in app_config['phrasebooks'] if not book.startswith('#')
-        ]
+        phrasebooks = []
+        for phrasebook in app_config['phrasebooks']:
+            if isinstance(phrasebook, str):
+                book = phrasebook
+                language_pair = app_config['default']
+            else:
+                book = phrasebook['file']
+                language_pair = phrasebook.get('pair', app_config['default'])
+
+            if book.startswith('#'):
+                continue
+
+            source = next(get_source(book, app_config['RitmomRoot']))
+            source = UnrollMultilineCell(default_language=language_pair)(source)
+            phrasebooks.append(source)
+
         phrasebook = chain(*phrasebooks)
 
         with Manager() as multiprocessing_manager:

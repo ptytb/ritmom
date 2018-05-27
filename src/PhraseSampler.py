@@ -3,6 +3,7 @@ from nltk import WordNetLemmatizer
 from nltk.corpus import wordnet
 from word_forms.word_forms import get_word_forms
 
+from src.Translator import Translator
 from src.WordNetCache import WordNetCache
 
 
@@ -18,6 +19,7 @@ class PhraseSampler:
         self.app_config = app_config
         self.lemmatizers = [WordNetLemmatizer()]
         self.word_net_cache = WordNetCache(app_config)
+        self.translator = Translator(app_config['dictionaries'])
 
     def lemmatize(self, word):
         for lemmatizer in self.lemmatizers:
@@ -96,5 +98,10 @@ class PhraseSampler:
         #     synsets = [synset for synset in synsets if synset.name().split('.')[0] == word]
         #     examples = [example for examples in [synset.examples() for synset in synsets] for example in examples]
         #     definitions = [s.definition() for s in synsets]
+
+        thesaurus_lang = language.capitalize()
+        thesaurus_definition = self.translator.translate(word, f'{thesaurus_lang}{thesaurus_lang}')
+        if thesaurus_definition:
+            definitions.append(thesaurus_definition)
 
         return self.WordInfo(definitions, examples, synonyms, antonyms)

@@ -31,6 +31,12 @@
             "type": "ldx",
             "encoding": "utf-8",
             "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx"
+        },
+        {
+            "pair": "EnglishEnglish",
+            "type": "ldx",
+            "encoding": "utf-8",
+            "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx"
         }
     ],
 
@@ -49,7 +55,7 @@
     "phrasebooks": [
       "#phrases/Phrasebook.csv",
       "#phrases/Phrasebook.xlsm",
-      "phrases/Phrasebook.txt"
+      {"file": "phrases/Phrasebook.txt", "pair": "EnglishRussian"}
     ],
 
     "default": "EnglishRussian",
