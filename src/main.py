@@ -30,14 +30,14 @@ if __name__ == '__main__':
     from src.Translator import Translator
 
 
-def get_source(file_path, root):
+def get_source(file_path, root, language_pair):
     file_path = f"{root}/{file_path}"
     if re.search(r'\.xls(m)?$', file_path):
         return ExcelSource(file_path)
     elif re.search(r'\.csv$', file_path):
         return CsvSource(file_path)
     elif re.search(r'\.txt$', file_path):
-        return TextSource(file_path)
+        return TextSource(file_path, language_pair)
     else:
         raise Exception(f'Type of source "{file_path}" is undetermined')
 
@@ -124,7 +124,7 @@ if __name__ == '__main__':
             if book.startswith('#'):
                 continue
 
-            source = next(get_source(book, app_config['RitmomRoot']))
+            source = next(get_source(book, app_config['RitmomRoot'], language_pair))
             source = UnrollMultilineCell(default_language=language_pair)(source)
             phrasebooks.append(source)
 

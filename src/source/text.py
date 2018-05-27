@@ -4,9 +4,10 @@ from src.Translator import Translator
 
 
 class TextSource:
-    def __init__(self, source):
+    def __init__(self, source, language_pair):
         self.source = abspath(source)
         self.translator = Translator(None)
+        self.language_pair = language_pair
 
     def __iter__(self):
         return self
@@ -20,5 +21,5 @@ class TextSource:
                 if line is None:
                     break
                 word = line.strip()
-                trans = self.translator.translate(word)
+                trans = self.translator.translate(word, self.language_pair)
                 yield word, trans
