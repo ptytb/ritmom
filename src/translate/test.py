@@ -36,6 +36,7 @@ class TestDictionaryReaders(unittest.TestCase):
 
         self.assertEqual(dsl.dictionary_header['type'], 'LDX')
         self.assertRegex(dsl.translate_word('nana'), 'grandmother')
+        self.assertNotRegex(dsl.translate_word('tangerine'), 'rine')
 
 
 if __name__ == '__main__':
