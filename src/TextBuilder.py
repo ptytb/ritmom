@@ -1,6 +1,6 @@
 from os import mkdir
 from sys import modules
-from postprocessing import *
+from src.postprocessing import *
 
 
 class TextBuilder:
@@ -30,7 +30,7 @@ class TextBuilder:
 
         for module in module_list:
             if module.startswith('text') and module_list[module]:
-                processed_text = modules[f'postprocessing.{module}'].process(text)
+                processed_text = modules[f'src.postprocessing.{module}'].process(text)
                 print(processed_text, file=self.stream, sep='')
 
     def speak(self, text):

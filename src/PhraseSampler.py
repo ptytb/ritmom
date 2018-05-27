@@ -1,10 +1,9 @@
-from collections.__init__ import namedtuple
-
-from nltk import WordNetLemmatizer, PorterStemmer
+from collections import namedtuple
+from nltk import WordNetLemmatizer
 from nltk.corpus import wordnet
-
-from WordNetCache import WordNetCache
 from word_forms.word_forms import get_word_forms
+
+from src.WordNetCache import WordNetCache
 
 
 class PhraseSampler:

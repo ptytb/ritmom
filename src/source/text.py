@@ -1,18 +1,12 @@
 from os.path import abspath
 
-import sys
-sys.path.append('..')
-
-import translate
-from translate.DslDictionary import DslDictionary
+from src.Translator import Translator
 
 
 class TextSource:
     def __init__(self, source):
         self.source = abspath(source)
-        self.dictionary = DslDictionary('D:\prog\GoldenDict\content\En-Ru-Apresyan.dsl.dz',
-                                        'utf-16',
-                                        r'D:\work\Python\ritmom\cache')
+        self.translator = Translator(None)
 
     def __iter__(self):
         return self
@@ -26,5 +20,5 @@ class TextSource:
                 if line is None:
                     break
                 word = line.strip()
-                trans = self.dictionary.translate_word(word)
+                trans = self.translator.translate(word)
                 yield word, trans

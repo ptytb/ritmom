@@ -8,10 +8,10 @@ from comtypes.client import CreateObject
 import re
 from datetime import datetime
 
-from AudioJingles import AudioJingles
-from TextBuilder import TextBuilder
-from PhraseSampler import PhraseSampler
-from postprocessing.lang_jp_reverse import jp_reverse
+from src.AudioJingles import AudioJingles
+from src.TextBuilder import TextBuilder
+from src.PhraseSampler import PhraseSampler
+from src.postprocessing.lang_jp_reverse import jp_reverse
 
 
 class SpeechStreamSeekPositionType(IntEnum):

@@ -1,34 +1,33 @@
 # coding: utf-8
 
 from itertools import chain
-
 from multiprocessing.pool import Pool
 from multiprocessing import Manager
-
 from traceback import print_exc
-
 from comtypes.client import CreateObject
-
 from datetime import datetime, timedelta
-
 from os.path import abspath
 from os import cpu_count
 from json import load
 import re
 import argparse
-
 from typing import Dict
-
-from AudioBuilder import AudioBuilder
-from AudioEncoderWorker import AudioEncoderWorker
-from WordNetCache import WordNetCache
 from pathtools.path import parent_dir_path
 
-from source.csv import CsvSource
-from source.excel import ExcelSource
-from source.text import TextSource
+import sys
+sys.path.append(r'.')
+import src
 
-from source.util import UnrollMultilineCell
+from src.AudioBuilder import AudioBuilder
+from src.AudioEncoderWorker import AudioEncoderWorker
+from src.WordNetCache import WordNetCache
+
+if __name__ == '__main__':
+    from src.source.csv import CsvSource
+    from src.source.excel import ExcelSource
+    from src.source.text import TextSource
+    from src.source.util import UnrollMultilineCell
+    from src.Translator import Translator
 
 
 def get_source(file_path):
@@ -59,9 +58,8 @@ def init_audio_builder(_encode_queue, _app_config, _lock, _only_wav):
     :return:
     """
     global audio_builder
-    app_config = _app_config
     WordNetCache._lock = _lock
-    audio_builder = AudioBuilder(app_config=app_config,
+    audio_builder = AudioBuilder(app_config=_app_config,
                                  encode_queue=_encode_queue,
                                  only_wav=_only_wav)
 
@@ -110,6 +108,8 @@ if __name__ == '__main__':
 
         app_config = load_config()
         app_config['RitmomRoot'] = ritmom_root
+
+        translator = Translator(app_config['dictionaries'])
 
         phrasebooks = [
             UnrollMultilineCell(default_language=app_config['default'])(

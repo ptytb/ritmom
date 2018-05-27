@@ -19,6 +19,21 @@
         "antonym": "!"
     },
 
+    "dictionaries": [
+    	{
+    		"pair": "EnglishRussian",
+    		"type": "dsl",
+    		"encoding": "utf-16",
+    		"file": "D:\\prog\\GoldenDict\\content\\En-Ru-Apresyan.dsl.dz"
+    	},
+        {
+            "pair": "EnglishRussian",
+            "type": "ldx",
+            "encoding": "utf-8",
+            "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx"
+        }
+    ],
+
     "postprocessing": {
         "japanese": {
             "text_output_furigana": true,

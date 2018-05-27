@@ -1,44 +1,17 @@
-import struct
-
-from .Translator import Translator
+from src.translate.Dictionary import Dictionary
+from src.utils.gzip_archive import get_uncompressed_size
+from src.utils.term_progress import print_progressbar
 import gzip
 import re
-import pickle
-from os.path import exists
 
 
-# Print iterations progress
-def print_progressbar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█'):
+class DslDictionary(Dictionary):
     """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
+    Manages loading, caching and translating with GoldenDict files (.dsl)
     """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filled_length = int(length * iteration // total)
-    bar = fill * filled_length + '-' * (length - filled_length)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
-    # Print New Line on Complete
-    if iteration == total:
-        print()
-
-
-def get_uncompressed_size(filename):
-    with open(filename, 'rb') as f:
-        f.seek(-4, 2)
-        return struct.unpack('I', f.read(4))[0]
-
-
-class DslDictionary(Translator):
 
     def __init__(self, file_path, encoding, cache_dir):
-        super(DslDictionary, self).__init__()
+        super().__init__(file_path, encoding, cache_dir, 'NAME')
 
         self.dictionary = dict()
         self.dictionary_header = dict()
@@ -54,7 +27,7 @@ class DslDictionary(Translator):
                 terms = re.match(r'#(?P<name>[^ ]+?) "(?P<value>[^"]+)"', line)
                 self.dictionary_header[terms['name']] = terms['value']
 
-            if self._load_cache(cache_dir):
+            if self._load_cache():
                 return
 
             while True:
@@ -70,7 +43,7 @@ class DslDictionary(Translator):
 
                 if line == '':
                     if current_record:
-                        self.dictionary[current_record['word']] = current_record['data']
+                        self.dictionary[current_record['word']] = ' '.join(current_record['data'])
                         current_record = None
                     continue
 
@@ -84,21 +57,7 @@ class DslDictionary(Translator):
 
         print()
         print(f'Saving cache for {self.dictionary_header["NAME"]}')
-        self._save_cache(cache_dir)
-
-    def _save_cache(self, cache_dir):
-        dictionary_cache_path = f'{cache_dir}/{self.dictionary_header["NAME"]}.dic'
-        pickle.dump({"dictionary": self.dictionary, "dictionary_header": self.dictionary_header},
-                    open(dictionary_cache_path, 'wb'))
-
-    def _load_cache(self, cache_dir):
-        dictionary_cache_path = f'{cache_dir}/{self.dictionary_header["NAME"]}.dic'
-        cache_exists = exists(dictionary_cache_path)
-        if cache_exists:
-            cache = pickle.load(open(dictionary_cache_path, 'rb'))
-            self.dictionary = cache['dictionary']
-            self.dictionary_header = cache["dictionary_header"]
-        return cache_exists
+        self._save_cache()
 
     @staticmethod
     def _filter_formatting(record):
@@ -112,9 +71,8 @@ class DslDictionary(Translator):
         return record.strip()
 
     def translate_word(self, word):
-        try:
-            items = self.dictionary[word]
-        except KeyError:
-            return None
+        trans = super().translate_word(word)
+        if trans is None:
+            return trans
+        return self._filter_formatting(trans)
 
-        return self._filter_formatting(' '.join(items))

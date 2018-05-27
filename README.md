@@ -2,8 +2,11 @@ RITMOM - Repetition is the mother of memory.
 
 
 ### What this app does
-It's for learning languages.
-Creates audio tracks sourcing a word and phrase pairs from your Google Translate favorites list.
+It's for learning languages. Creates audio tracks from:
+
+- Your **Google Translate favorites** list. Feeds word and phrase pairs from.
+- Plain text file with foreign word list. Offline dictionaries are used for translation.
+
 
 The idea is to use a sequence
 
@@ -48,14 +51,22 @@ For furigana support you'll need [MeCab](https://doc-0s-9o-docs.googleuserconten
 
 You'll need to install the requirements `pip install -r requirements-jp.txt`
 
+#### Offline dictionaries
+
+Supported dictionary formats:
+
+- DSL (Used by [GoldenDict](https://goldendict.org/))
+- LDX (Used by [ABBYY Lingvo]() and [Lingoes](https://www.lingoes.net))
+
 ## TODO
 
-- [ ] Text: write approximate audio timestamp
+- [ ] Do try fuzzy matching if no translation found
+- [X] Text: write approximate audio timestamp
 - [ ] Arbitrary Text Source
 - [X] Generate text output too
 - [ ] Make a sequence configurable from a config
 - [ ] Fix wordnet for languages differ from English
-- [ ] Search for collocations
+- [X] Search for collocations
 - [ ] Download missing NLTK packages and corpuses automatically if missing
 - [X] Fix index before running tasks
 - [X] Add synonyms and antonyms
