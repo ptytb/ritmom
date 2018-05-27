@@ -111,7 +111,7 @@ class LdxDictionary(Dictionary):
         for i in range(0, total_definitions):
             index_data, definition_data = self._read_definition_data(inflated_data, definitions_offset, xml_offset, data_len, i)
             word, info = definition_data[0], definition_data[1]
-            self.dictionary[word] = info
+            self.dictionary_data[word] = info
             if i % 5000 == 0:
                 print_progressbar(i, total_definitions, f"Reading LDX {self.dictionary_header['id']}")
 
@@ -145,13 +145,12 @@ class LdxDictionary(Dictionary):
             self.get_int(offset+14, buffer=inflated_data),
         )
 
-    def translate_word(self, word):
-        trans = super().translate_word(word)
-        if trans is None:
-            return trans
-        return self._filter_formatting(trans)
-
     @staticmethod
-    def _filter_formatting(record):
-        record = re.sub(r'<[^>]+?>', '', record)
-        return record
+    def _filter_formatting(text):
+        dropout_tags = ['U', 'M']
+        for tag in dropout_tags:
+            text = re.sub(rf'<{tag}>.*?</{tag}>', '', text)
+        text = re.sub(r'<[^>]+?>', '', text)  # markup
+        text = re.sub(r'^[^|]*\|\|[^.]*\.', '', text)  # transcription
+        text = re.sub(r'\s*\[[^]]*]', '', text)  # special domain demarcation
+        return text

@@ -11,12 +11,8 @@ class DslDictionary(Dictionary):
     """
 
     def __init__(self, file_path, encoding, cache_dir):
-        super().__init__(file_path, encoding, cache_dir, 'NAME')
-
-        self.dictionary = dict()
-        self.dictionary_header = dict()
+        super(DslDictionary, self).__init__(file_path, encoding, cache_dir, 'NAME')
         current_record = None
-
         file_size = get_uncompressed_size(file_path)
 
         with gzip.open(file_path, mode='rt', encoding=encoding) as f:
@@ -43,7 +39,7 @@ class DslDictionary(Dictionary):
 
                 if line == '':
                     if current_record:
-                        self.dictionary[current_record['word']] = ' '.join(current_record['data'])
+                        self.dictionary_data[current_record['word']] = ' '.join(current_record['data'])
                         current_record = None
                     continue
 
@@ -60,19 +56,16 @@ class DslDictionary(Dictionary):
         self._save_cache()
 
     @staticmethod
-    def _filter_formatting(record):
+    def _filter_formatting(text):
         dropout_tags = ['b', 'com', r'\*']
         for tag in dropout_tags:
-            record = re.sub(rf'\[{tag}\].*?\[/{tag}\]', '', record)
-        record = re.sub(r'\d+[.)]\s*', '', record)  # numbered lists
-        record = re.sub(rf'\\\[.*?\\\]', '', record)  # transcriptions
-        record = re.sub(rf'\[.*?\]', '', record)  # tagged markup
-        record = re.sub(rf'\s*\(\s*\)\s*', '', record)  # empty brackets
-        return record.strip()
+            text = re.sub(rf'\[{tag}\].*?\[/{tag}\]', '', text)
+        text = re.sub(r'\d+[.)]\s*', ';', text)  # numbered lists
+        text = re.sub(rf'\\\[.*?\\\]', '', text)  # transcriptions
+        text = re.sub(rf'\[.*?\]', '', text)  # tagged markup
+        text = re.sub(rf'\s*\(\s*\)\s*', '', text)  # empty brackets
+        text = re.sub(rf'^\s*;*', '', text)
+        text = re.sub(rf'\s*;(\s*;)*\s*', '; ', text)
+        return text.strip()
 
-    def translate_word(self, word):
-        trans = super().translate_word(word)
-        if trans is None:
-            return trans
-        return self._filter_formatting(trans)
 
