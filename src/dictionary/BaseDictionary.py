@@ -1,8 +1,9 @@
 import pickle
 from os.path import exists, abspath
+from abc import ABC, abstractmethod
 
 
-class Dictionary:
+class BaseDictionary(ABC):
 
     def __init__(self, file_path, encoding, cache_dir, cache_id_header):
         self.dictionary_data = dict()
@@ -11,6 +12,11 @@ class Dictionary:
         self.encoding = encoding
         self.file_path = file_path
         self.cache_id_header = cache_id_header
+        self.language_pair = None  # filled by load()
+
+    @abstractmethod
+    def get_examples(self, word):
+        ...
 
     def translate_word(self, word):
         trans = self.dictionary_data.get(word, None)
@@ -34,19 +40,23 @@ class Dictionary:
         return cache_exists
 
     @staticmethod
-    def load(file_path, dict_type, encoding):
-        from src.translate.DslDictionary import DslDictionary
-        from src.translate.LdxDictionary import LdxDictionary
+    def load(file_path, dict_type, encoding, language_pair):
+        from src.dictionary.DslDictionary import DslBaseDictionary
+        from src.dictionary.LdxDictionary import LdxBaseDictionary
 
         cache_dir = abspath(r'./cache')
         if dict_type == 'dsl':
-            return DslDictionary(file_path, encoding, cache_dir)
+            dictionary = DslBaseDictionary(file_path, encoding, cache_dir)
         elif dict_type == 'ldx':
-            return LdxDictionary(file_path, encoding, cache_dir)
+            dictionary = LdxBaseDictionary(file_path, encoding, cache_dir)
         else:
             raise Exception('Wrong dictionary type')
+        dictionary.language_pair = language_pair
+        return dictionary
 
     @staticmethod
     def _filter_formatting(text):
-        pass
+        raise NotImplementedError()
 
+    def __getitem__(self, item):
+        return self.dictionary_data.get(item, None)

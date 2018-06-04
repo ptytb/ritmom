@@ -5,7 +5,7 @@ import zlib
 from collections import namedtuple
 
 from src.utils.term_progress import print_progressbar
-from .Dictionary import Dictionary
+from .BaseDictionary import BaseDictionary
 
 
 IndexData = namedtuple('IndexData', [
@@ -18,7 +18,8 @@ IndexData = namedtuple('IndexData', [
 ])
 
 
-class LdxDictionary(Dictionary):
+class LdxBaseDictionary(BaseDictionary):
+
     def __init__(self, file_path, encoding, cache_dir):
         super().__init__(file_path, encoding, cache_dir, 'id')
 
@@ -154,3 +155,7 @@ class LdxDictionary(Dictionary):
         text = re.sub(r'^[^|]*\|\|[^.]*\.', '', text)  # transcription
         text = re.sub(r'\s*\[[^]]*]', '', text)  # special domain demarcation
         return text
+
+    def get_examples(self, word):
+        word_info = self[word]
+        return list()

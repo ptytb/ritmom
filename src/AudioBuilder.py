@@ -10,7 +10,7 @@ from datetime import datetime
 
 from src.AudioJingles import AudioJingles
 from src.TextBuilder import TextBuilder
-from src.PhraseSampler import PhraseSampler
+from src.PhraseExamples import PhraseExamples
 from src.postprocessing.lang_jp_reverse import jp_reverse
 
 
@@ -53,7 +53,7 @@ class AudioBuilder:
             assert all(map(has_voice, ['foreign1', 'foreign2', 'native']))
 
         self.sounds = AudioJingles(self.sounds)
-        self.sampler = PhraseSampler(app_config)
+        self.sampler = PhraseExamples(app_config)
 
         self.text_builder = TextBuilder(app_config)
 

@@ -60,6 +60,8 @@ Supported dictionary formats:
 
 ## TODO
 
+- [ ] Use TextChunk instead of plain text
+- [ ] Extract examples from offline dictionaries
 - [ ] Add subtitle (.srt) corpus reader and examples
 - [ ] Do try fuzzy matching if no translation found
 - [X] Text: write approximate audio timestamp

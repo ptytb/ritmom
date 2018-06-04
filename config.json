@@ -95,7 +95,8 @@
         "definition": "jingles/C-E-G.wav",
         "usage_example": "jingles/page-flipping.wav",
         "synonym": "jingles/C-G.wav",
-        "antonym": "jingles/C-D.wav"
+        "antonym": "jingles/C-D.wav",
+        "by_letters": "jingles/three-beeps.wav"
     },
 
     "pattern": [

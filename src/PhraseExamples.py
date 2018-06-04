@@ -7,7 +7,7 @@ from src.Translator import Translator
 from src.WordNetCache import WordNetCache
 
 
-class PhraseSampler:
+class PhraseExamples:
     """
     Provides definition, examples and excerpts.
     Excerpts are taken from corpuses listed by **phraseExamples** option.
@@ -105,5 +105,6 @@ class PhraseSampler:
         thesaurus_definition = self.translator.translate(word, f'{thesaurus_lang}{thesaurus_lang}')
         if thesaurus_definition:
             definitions.append(thesaurus_definition)
+        examples += self.translator.get_examples(word, language)
 
         return self.WordInfo(definitions, examples, synonyms, antonyms)

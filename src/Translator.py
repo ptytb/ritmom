@@ -1,4 +1,6 @@
-from src.translate.Dictionary import Dictionary
+from typing import List, Dict
+
+from src.dictionary.BaseDictionary import BaseDictionary
 from src.utils.singleton import Singleton
 
 
@@ -14,14 +16,14 @@ class Translator(metaclass=Singleton):
         if dict_descriptors is None:
             return
 
-        self.dictionaries = dict()
-        self.all_dictionaries = list()
+        self.dictionaries: Dict[str, List[BaseDictionary]] = dict()
+        self.all_dictionaries: List[BaseDictionary] = list()
         self._load_dictionaries(dict_descriptors)
 
     def _load_dictionaries(self, dict_descriptors):
         for d in dict_descriptors:
-            dictionary = Dictionary.load(d['file'], d['type'], d['encoding'])
             language_pair = d['pair']
+            dictionary = BaseDictionary.load(d['file'], d['type'], d['encoding'], language_pair)
 
             if language_pair not in self.dictionaries:
                 self.dictionaries[language_pair] = list()
@@ -46,3 +48,10 @@ class Translator(metaclass=Singleton):
                     summary += ';' + trans
 
         return summary
+
+    def get_examples(self, word, language):
+        examples = list()
+        for d in self.all_dictionaries:
+            if d.language_pair.startswith(language.capitalize()):
+                examples += d.get_examples(word)
+        return examples
