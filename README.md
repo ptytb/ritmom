@@ -60,12 +60,13 @@ Supported dictionary formats:
 
 ## TODO
 
-- [ ] Use TextChunk instead of plain text
-- [ ] Extract examples from offline dictionaries
+- [ ] Download and cache required resources (dictionaries, pre-trained models, etc)
+- [X] Use TextChunk instead of plain text
+- [X] Extract examples from offline dictionaries
 - [ ] Add subtitle (.srt) corpus reader and examples
 - [ ] Do try fuzzy matching if no translation found
 - [X] Text: write approximate audio timestamp
-- [ ] Arbitrary Text Source
+- [ ] Arbitrary Text Source (book, subtitles, news)
 - [X] Generate text output too
 - [ ] Make a sequence configurable from a config
 - [ ] Fix wordnet for languages differ from English

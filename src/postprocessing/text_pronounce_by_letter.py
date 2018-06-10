@@ -10,14 +10,16 @@ def needs_process(text, language):
             'x',
             'ru',
             'bu',
+            'eu',
             'au',
-            'ce',
+            'c[eiy]',
             'ei',
             'ou',
             'ow',
             'aw',
             'kn',
-            'e$'
+            'e$',
+            'iae'
         ]
     }
 

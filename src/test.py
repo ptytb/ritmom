@@ -2,8 +2,14 @@ import unittest
 from os.path import pardir, pathsep
 from sys import modules
 
+from src.Sampler import Chunk, ChunkProcessor
 from src.dictionary.LdxDictionary import LdxBaseDictionary
 from src.dictionary.DslDictionary import DslBaseDictionary
+from src.filter.ExplainJapaneseSentences import ExplainJapaneseSentences
+from src.filter.ExplainKanji import ExplainKanji
+from src.filter.PronounceByLetter import PronounceByLetter
+from src.filter.StubFinalizer import StubFinalizer
+from src.filter.TidyUpEnglish import TidyUpEnglish
 
 
 class TestDictionaryReaders(unittest.TestCase):
@@ -40,6 +46,25 @@ class TestDictionaryReaders(unittest.TestCase):
         self.assertEqual(dsl.dictionary_header['type'], 'LDX')
         self.assertRegex(dsl.translate_word('nana'), 'grandmother')
         # self.assertNotRegex(dsl.translate_word('tangerine'), 'rine')
+
+    def test_chunk_preprocessing(self):
+        c0 = Chunk(text='"some guy\'s bad text {', language='english', audible=True, printable=True, final=False)
+        p0 = ChunkProcessor(filters=[TidyUpEnglish(), StubFinalizer()])
+        result = p0.apply_filters(c0)
+
+        c1 = Chunk(text='知りません', language='japanese', audible=False, printable=True, final=False)
+        p1 = ChunkProcessor(filters=[ExplainKanji(), StubFinalizer()])
+        result = p1.apply_filters(c1)
+
+        c2 = Chunk(text='faux pas', language='english', audible=True, printable=True, final=False)
+        p2 = ChunkProcessor(filters=[TidyUpEnglish(), PronounceByLetter(), StubFinalizer()])
+        result = p2.apply_filters(c2)
+
+        c3 = Chunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
+        p3 = ChunkProcessor(filters=[ExplainJapaneseSentences(), StubFinalizer()])
+        result = p3.apply_filters(c3)
+
+        pass
 
 
 if __name__ == '__main__':

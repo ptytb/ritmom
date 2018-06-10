@@ -1,137 +1,189 @@
 {
-    "words_per_audio": 10,
-
-    "generate_text": true,
-
-    "text_encoding": {
-      "JapaneseEnglish": "cp932",
-      "EnglishRussian": "cp1251"
-    },
-
-    "text_jingles": {
-        "silence": " ",
-        "silence_long": "\n",
-        "end_of_part": "\n***",
-        "excerpt": "\"",
-        "definition": "=",
-        "usage_example": ":",
-        "synonym": "~",
-        "antonym": "!"
-    },
-
-    "dictionaries": [
-    	{
-    		"pair": "EnglishRussian",
-    		"type": "dsl",
-    		"encoding": "utf-16",
-    		"file": "D:\\prog\\GoldenDict\\content\\En-Ru-Apresyan.dsl.dz"
-    	},
-        {
-            "pair": "EnglishRussian",
-            "type": "ldx",
-            "encoding": "utf-8",
-            "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx"
-        },
-        {
-            "pair": "EnglishEnglish",
-            "type": "ldx",
-            "encoding": "utf-8",
-            "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx"
-        }
-    ],
-
-    "postprocessing": {
-        "japanese": {
-            "text_output_furigana": true,
-            "text_explain_kanji": true,
-            "text_explain_sentence_parts": true
-        },
-        "english": {
-            "text_filter_apostrophe": true
-        }
-    },
-	
-	"_comment": "Paths with leading # are ignored",
-    "phrasebooks": [
-      "#phrases/Phrasebook.csv",
-      "#phrases/Phrasebook.xlsm",
-      {"file": "phrases/Phrasebook.txt", "pair": "EnglishRussian"}
-    ],
-
-    "default": "EnglishRussian",
-
-    "languages": {
-        "EnglishRussian": {
-            "foreign1": "Salli",
-            "foreign2": "Brian",
-            "native": "Milena",
-            "ignore": false
-        },
-        "RussianEnglish": {
-          "foreign1": "Milena",
-          "foreign2": "Milena",
-          "native": "Salli",
-            "ignore": true
-        },
-        "JapaneseEnglish":{
-            "foreign1": "Kyoko",
-            "foreign2": "Misaki",
-            "native": "Salli",
-            "ignore": false
-        },
-        "JapaneseRussian":{
-          "foreign1": "Kyoko",
-          "foreign2": "Misaki",
-          "native": "Milena",
-          "ignore": true
-        }
-    },
-
-    "jingles": {
-        "silence": "silence 0.2",
-        "silence_long": "silence 0.5",
-        "end_of_part": "jingles/ding.wav",
-        "excerpt": "jingles/ripping-paper.wav",
-        "definition": "jingles/C-E-G.wav",
-        "usage_example": "jingles/page-flipping.wav",
-        "synonym": "jingles/C-G.wav",
-        "antonym": "jingles/C-D.wav",
-        "by_letters": "jingles/three-beeps.wav"
-    },
-
-    "pattern": [
-        {"speak": "foreign1", "rate": -6, "volume": 100},
-        {"jingle": "silence"},
-
-        {"speak": "native", "rate": 0, "volume": 80},
-        {"jingle": "silence"},
-
-        {"jingle": "silence_long"},
-
-        {"speak": "foreign2", "rate": -6, "volume": 100},
-        {"jingle": "silence"},
-
-        {"speak": "native", "rate": 0, "volume": 80},
-        {"jingle": "silence"},
-
-        {"jingle": "silence_long"},
-
-        {"speak": "definitions", "rate": 0, "volume": 80},
-        {"speak": "examples", "rate": 0, "volume": 80},
-        {"speak": "synonyms", "rate": 0, "volume": 80},
-        {"speak": "antonyms", "rate": 0, "volume": 80},
-        {"speak": "excerpts", "rate": 0, "volume": 80},
-
-        {"jingle": "silence_long"}
-    ],
-
-    "phraseExamples": {
-        "english": ["brown", "gutenberg", "nps_chat", "webtext", "reuters", "genesis"],
-        "japanese": ["knbc", "jeita"]
-    },
-
-    "phraseJoinChar": {
-        "english": " ",
-        "japanese": ""
+  "words_per_audio": 10,
+  "generate_text": true,
+  "resource": {
+    "rakuten_ma_model": {
+      "url": "https://github.com/ikegami-yukino/rakutenma-python/raw/master/rakutenma/model/model_ja.min.json",
+      "destination": "resource/model_ja.min.json",
+      "description": ""
     }
+  },
+  "text_encoding": {
+    "JapaneseEnglish": "cp932",
+    "EnglishRussian": "cp1251"
+  },
+  "text_jingles": {
+    "silence": " ",
+    "silence_long": "\n",
+    "end_of_part": "\n***",
+    "excerpt": "\"",
+    "definition": "=",
+    "usage_example": ":",
+    "synonym": "~",
+    "antonym": "!"
+  },
+  "dictionaries": [
+    {
+      "pair": "EnglishRussian",
+      "type": "dsl",
+      "encoding": "utf-16",
+      "file": "D:\\prog\\GoldenDict\\content\\En-Ru-Apresyan.dsl.dz"
+    },
+    {
+      "pair": "EnglishRussian",
+      "type": "ldx",
+      "encoding": "utf-8",
+      "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx"
+    },
+    {
+      "pair": "EnglishEnglish",
+      "type": "ldx",
+      "encoding": "utf-8",
+      "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx"
+    }
+  ],
+  "postprocessing": {
+    "japanese": {
+      "text_output_furigana": true,
+      "text_explain_kanji": true,
+      "text_explain_sentence_parts": true
+    },
+    "english": {
+      "text_filter_apostrophe": true
+    }
+  },
+  "_comment": "Paths with leading # are ignored",
+  "phrasebooks": [
+    "#phrases/Phrasebook.csv",
+    "#phrases/Phrasebook.xlsm",
+    {
+      "file": "phrases/Phrasebook.txt",
+      "pair": "EnglishRussian"
+    }
+  ],
+  "default": "EnglishRussian",
+  "languages": {
+    "EnglishRussian": {
+      "foreign1": "Salli",
+      "foreign2": "Brian",
+      "native": "Milena",
+      "ignore": false
+    },
+    "RussianEnglish": {
+      "foreign1": "Milena",
+      "foreign2": "Milena",
+      "native": "Salli",
+      "ignore": true
+    },
+    "JapaneseEnglish": {
+      "foreign1": "Kyoko",
+      "foreign2": "Misaki",
+      "native": "Salli",
+      "ignore": false
+    },
+    "JapaneseRussian": {
+      "foreign1": "Kyoko",
+      "foreign2": "Misaki",
+      "native": "Milena",
+      "ignore": true
+    }
+  },
+  "jingles": {
+    "silence": "silence 0.2",
+    "silence_long": "silence 0.5",
+    "end_of_part": "jingles/ding.wav",
+    "excerpt": "jingles/ripping-paper.wav",
+    "definition": "jingles/C-E-G.wav",
+    "usage_example": "jingles/page-flipping.wav",
+    "synonym": "jingles/C-G.wav",
+    "antonym": "jingles/C-D.wav",
+    "by_letters": "jingles/three-beeps.wav",
+    "space": "jingles/space.wav"
+  },
+  "pattern": [
+    {
+      "speak": "foreign1",
+      "rate": -6,
+      "volume": 100
+    },
+    {
+      "jingle": "silence"
+    },
+    {
+      "speak": "native",
+      "rate": 0,
+      "volume": 80
+    },
+    {
+      "jingle": "silence"
+    },
+    {
+      "jingle": "silence_long"
+    },
+    {
+      "speak": "foreign2",
+      "rate": -6,
+      "volume": 100
+    },
+    {
+      "jingle": "silence"
+    },
+    {
+      "speak": "native",
+      "rate": 0,
+      "volume": 80
+    },
+    {
+      "jingle": "silence"
+    },
+    {
+      "jingle": "silence_long"
+    },
+    {
+      "speak": "definitions",
+      "rate": 0,
+      "volume": 80
+    },
+    {
+      "speak": "examples",
+      "rate": 0,
+      "volume": 80
+    },
+    {
+      "speak": "synonyms",
+      "rate": 0,
+      "volume": 80
+    },
+    {
+      "speak": "antonyms",
+      "rate": 0,
+      "volume": 80
+    },
+    {
+      "speak": "excerpts",
+      "rate": 0,
+      "volume": 80
+    },
+    {
+      "jingle": "silence_long"
+    }
+  ],
+  "phraseExamples": {
+    "english": [
+      "brown",
+      "gutenberg",
+      "nps_chat",
+      "webtext",
+      "reuters",
+      "genesis"
+    ],
+    "japanese": [
+      "knbc",
+      "jeita"
+    ]
+  },
+  "phraseJoinChar": {
+    "english": " ",
+    "japanese": ""
+  }
 }
