@@ -7,7 +7,9 @@ class PronounceByLetter(BaseFilter):
 
     def __call__(self, chunk):
         chunk = self._duplicate_chunk(chunk)
+        chunk.final = True
         result = [chunk]
+
         if self._needs_process(chunk.text, chunk.language):
             result.append(JingleChunk(jingle='by_letters'))
             for letter in chunk.text:

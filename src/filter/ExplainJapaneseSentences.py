@@ -21,6 +21,8 @@ class ExplainJapaneseSentences(BaseFilter):
 
     def __call__(self, chunk):
         chunk = self._duplicate_chunk(chunk)
+        chunk.final = True
+
         result = [chunk]
         text = self.tokenize(chunk.text)
         result.append(Chunk(text=text, language='japanese', audible=False, printable=True, final=True))

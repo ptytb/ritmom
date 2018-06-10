@@ -5,5 +5,6 @@ from re import sub
 class TidyUpEnglish(BaseFilter):
     def __call__(self, chunk):
         chunk = self._duplicate_chunk(chunk)
+        chunk.final = True
         chunk.text = sub(r"^['`\"]+|['`\"]+$", '', chunk.text)
         return [chunk]
