@@ -2,10 +2,9 @@ from src.filter.BaseFilter import BaseFilter
 from re import sub
 
 
-class TidyUpEnglish(BaseFilter):
+class TidyUpText(BaseFilter):
     def __call__(self, chunk):
         chunk = self._duplicate_chunk(chunk)
         chunk.final = True
-        if chunk.language == 'english':
-            chunk.text = sub(r"^['`\"]+|['`\"]+$", '', chunk.text)
+        chunk.text = sub(r"[\\{}]", '', chunk.text)
         return [chunk]

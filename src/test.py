@@ -1,12 +1,11 @@
 import unittest
 from json import load
-from os.path import pardir, pathsep, abspath
+from os.path import pardir, abspath
 from sys import modules
 
 from pathtools.path import parent_dir_path
 
 from src.PhraseExamples import PhraseExamples
-from src.Sequencer import Chunk, ChunkProcessor, TextChunk, SpeechChunk
 from src.dictionary.LdxDictionary import LdxBaseDictionary
 from src.dictionary.DslDictionary import DslBaseDictionary
 from src.filter.AddFurigana import AddFurigana
@@ -56,6 +55,8 @@ class TestDictionaryReaders(unittest.TestCase):
         # self.assertNotRegex(dsl.translate_word('tangerine'), 'rine')
 
     def test_chunk_preprocessing(self):
+        from src.Sequencer import ChunkProcessor, TextChunk
+
         c0 = TextChunk(text='"some guy\'s bad text {', language='english', audible=True, printable=True, final=False)
         p0 = ChunkProcessor(filters=[TidyUpEnglish(), StubFinalizer()])
         result0 = p0.apply_filters(c0)
@@ -86,6 +87,7 @@ class TestDictionaryReaders(unittest.TestCase):
         self.assertEqual(b, 'japanese')
 
     def test_promote(self):
+        from src.Sequencer import TextChunk, SpeechChunk
         a = TextChunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
         b = a.promote(SpeechChunk, volume=75)
 

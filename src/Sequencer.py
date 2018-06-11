@@ -4,7 +4,9 @@ from typing import Deque, List
 import attr
 
 from src.filter import BaseFilter
+from src.filter.PronounceByLetter import PronounceByLetter
 from src.utils.lists import flatten
+from src.filter.TidyUpText import TidyUpText
 
 
 def make_range_validator(low, high):
@@ -48,7 +50,7 @@ class TextChunk(Chunk):
 
 
 @attr.s
-class AudioChunk(Chunk):
+class AudioChunkMixin:
     volume = attr.ib(type=int, validator=[attr.validators.instance_of(int),
                                           make_range_validator(0, 100)],
                      default=50)
@@ -58,13 +60,12 @@ class AudioChunk(Chunk):
 
 
 @attr.s
-class SpeechChunk(AudioChunk, TextChunk):
+class SpeechChunk(AudioChunkMixin, TextChunk):
     voice = attr.ib(default=None)
-    final = attr.ib(type=bool, default=True)
 
 
 @attr.s
-class JingleChunk(AudioChunk):
+class JingleChunk(AudioChunkMixin, Chunk):
     jingle = attr.ib(type=str, default=None)
     final = attr.ib(type=bool, default=True)
 
@@ -91,7 +92,10 @@ class ChunkProcessor:
 class Sequencer:
     def __init__(self):
         self.queue: Deque[Chunk] = deque()
-        self.chunk_processor = ChunkProcessor()
+        self.chunk_processor = ChunkProcessor(filters=[
+            PronounceByLetter(),
+            TidyUpText()
+        ])
 
     def append(self, chunk: Chunk):
         flat = flatten([attr.evolve(chunk)])  # copy as an alternative to immutability

@@ -1,4 +1,3 @@
-from src.Sequencer import Chunk, JingleChunk
 from src.filter.BaseFilter import BaseFilter
 from re import search
 
@@ -6,17 +5,23 @@ from re import search
 class PronounceByLetter(BaseFilter):
 
     def __call__(self, chunk):
+        from src.Sequencer import JingleChunk, TextChunk
+
         chunk = self._duplicate_chunk(chunk)
         chunk.final = True
         result = [chunk]
 
         if self._needs_process(chunk.text, chunk.language):
-            result.append(JingleChunk(jingle='by_letters'))
+            result.append(JingleChunk(jingle='silence_long', printable=False))
+            result.append(JingleChunk(jingle='by_letter', printable=False))
+            result.append(JingleChunk(jingle='silence', printable=False))
             for letter in chunk.text:
+                result.append(JingleChunk(jingle='silence', printable=False))
                 if letter.isspace():
-                    result.append(JingleChunk(jingle='space'))
+                    result.append(JingleChunk(jingle='space', printable=False))
                 else:
-                    result.append(Chunk(text=letter, language='english', audible=True, printable=False, final=True))
+                    result.append(TextChunk(text=letter, language='english',
+                                            audible=True, printable=False, final=True))
         return result
 
     @staticmethod

@@ -20,7 +20,8 @@
     "definition": "=",
     "usage_example": ":",
     "synonym": "~",
-    "antonym": "!"
+    "antonym": "!",
+    "by_letter": " "
   },
   "dictionaries": [
     {
@@ -97,7 +98,7 @@
     "usage_example": "jingles/page-flipping.wav",
     "synonym": "jingles/C-G.wav",
     "antonym": "jingles/C-D.wav",
-    "by_letters": "jingles/three-beeps.wav",
+    "by_letter": "jingles/three-beeps.wav",
     "space": "jingles/space.wav"
   },
   "pattern": [
