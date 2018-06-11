@@ -1,5 +1,5 @@
 # coding: utf-8
-
+from collections import Counter
 from itertools import chain
 from multiprocessing.pool import Pool
 from multiprocessing import Manager
@@ -11,7 +11,7 @@ from os import cpu_count
 from json import load
 import re
 import argparse
-from typing import Dict
+from typing import Dict, Tuple, List
 from pathtools.path import parent_dir_path
 
 import sys
@@ -137,17 +137,17 @@ if __name__ == '__main__':
             encode_worker = AudioEncoderWorker(encode_queue, app_config)
             encode_worker.start()
 
-            with Pool(processes=cpu_count() - 2,
+            with Pool(processes=cpu_count() // 2,
                       initializer=init_audio_builder,
                       initargs=(encode_queue, app_config, _lock, args.w)) as pool:
 
-                builder_queue: Dict[str, list] = dict()
-                builder_parts: Dict[str, int] = dict()
+                builder_queue: Dict[str, List[Tuple]] = dict()
+                builder_parts: Counter = Counter()
 
                 def process_chunk():
-                    pool.apply_async(make_audio_track, (language_pair,
-                                                        builder_queue.pop(language_pair),
-                                                        builder_parts[language_pair]))
+                    items = builder_queue.pop(language_pair)
+                    part_number = builder_parts[language_pair]
+                    pool.apply_async(make_audio_track, (language_pair, items, part_number))
 
                     builder_queue[language_pair] = list()
                     builder_parts[language_pair] += 1
@@ -162,7 +162,8 @@ if __name__ == '__main__':
                     if len(builder_queue[language_pair]) > app_config['words_per_audio']:
                         process_chunk()
                 for language_pair in builder_queue:
-                    process_chunk()
+                    if len(builder_queue[language_pair]):
+                        process_chunk()
 
                 pool.close()
                 pool.join()
