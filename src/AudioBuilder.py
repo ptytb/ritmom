@@ -172,9 +172,11 @@ class AudioBuilder:
                         if not isinstance(example, JingleChunk):
                             if example.language == foreign_name:
                                 voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                                volume = 100
                             else:
                                 voice = self.voices_com.Item(self.voices[language_pair]['native'])
-                            example = example.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                                volume = 50
+                            example = example.promote(SpeechChunk, rate=0, volume=volume, voice=voice, final=True)
                         example.printable = first_pass
                         self.sequencer.append(example)
 
@@ -196,10 +198,7 @@ class AudioBuilder:
                     if excerpts is not None:
                         for excerpt in excerpts:
                             if not isinstance(excerpt, JingleChunk):
-                                if excerpt.language == foreign_name:
-                                    voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                                else:
-                                    voice = self.voices_com.Item(self.voices[language_pair]['native'])
+                                voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
                                 excerpt = excerpt.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
                             excerpt.printable = first_pass
                             self.sequencer.append(excerpt)

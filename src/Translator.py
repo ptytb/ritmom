@@ -54,8 +54,8 @@ class Translator(metaclass=Singleton):
     def get_examples(self, word, language):
 
         def example_pair(foreign, native, pair):
-            foreign = TextChunk(text=pair[0], language=foreign)
-            native = TextChunk(text=pair[1], language=native)
+            foreign = TextChunk(text=pair[0].strip(), language=foreign)
+            native = TextChunk(text=pair[1].strip(), language=native)
             return foreign, native
 
         examples = list()

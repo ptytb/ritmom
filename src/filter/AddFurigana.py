@@ -6,17 +6,18 @@ from src.filter.BaseFilter import BaseFilter
 
 class AddFurigana(BaseFilter):
 
-    def __call__(self, chunk):
+    def __call__(self, chunk: TextChunk):
         chunk = self._duplicate_chunk(chunk)
-        chunk.printable = False
-        chunk.final = True
-
         result = [chunk]
-        tokens = self.tokenize(chunk.text)
-        for t in tokens:
-            result.append(TextChunk(text=t[0], language='japanese', audible=False, printable=True, final=True))
-            if len(t) > 1:
-                result.append(TextChunk(text=t[1], language='japanese', audible=False, printable=True, final=True))
+
+        if chunk.language == 'japanese':
+            chunk.printable = False
+            tokens = self.tokenize(chunk.text)
+            for t in tokens:
+                result.append(TextChunk(text=t[0], language='japanese', audible=False, printable=True, final=True))
+                if len(t) > 1:
+                    text = f' ({t[1]}) '
+                    result.append(TextChunk(text=text, language='japanese', audible=False, printable=True, final=True))
 
         return result
 
