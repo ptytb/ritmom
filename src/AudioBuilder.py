@@ -1,3 +1,4 @@
+from copy import deepcopy
 from os import mkdir
 
 from comtypes.gen import SpeechLib
@@ -5,13 +6,14 @@ from operator import contains
 from functools import partial
 from enum import IntEnum
 from comtypes.client import CreateObject
-import re
 from datetime import datetime
 
 from src.AudioJingles import AudioJingles
+from src.Sequencer import Sequencer, TextChunk, Chunk, JingleChunk, SpeechChunk
 from src.TextBuilder import TextBuilder
 from src.PhraseExamples import PhraseExamples
-from src.postprocessing.lang_jp_reverse import jp_reverse
+
+from src.utils.config import split_name_pair
 
 
 class SpeechStreamSeekPositionType(IntEnum):
@@ -20,42 +22,14 @@ class SpeechStreamSeekPositionType(IntEnum):
     SSSPTRelativeToEnd = 2
 
 
-class AudioBuilder:
-    def __init__(self, *, app_config, encode_queue, only_wav):
-        languages = app_config['languages']
-        self.sounds = app_config['jingles']
-        self.encode_queue = encode_queue
-        self.app_config = app_config
-        self.only_wav = only_wav
-
-        def split_name_pair(name_pair):
-            i = list(re.finditer(r'[A-Z]', language_pair))[1].span()[0]
-            return name_pair[:i].lower(), name_pair[i:].lower()
-
-        self.engine = CreateObject("SAPI.SpVoice")
-        self.voices = dict()
-
-        self.voices_com = voices = self.engine.GetVoices()
-        for language_pair in languages:
-            self.voices[language_pair] = dict()
-
-            foreign_name, native_name = split_name_pair(language_pair)
-            self.voices[language_pair]['native_name'] = native_name
-            self.voices[language_pair]['foreign_name'] = foreign_name
-
-            for purpose in languages[language_pair]:
-                for i in range(voices.Count):
-                    desc = voices.Item(i).GetDescription()
-                    if desc.find(languages[language_pair][purpose]) != -1:
-                        self.voices[language_pair][purpose] = i
-
-            has_voice = partial(contains, self.voices[language_pair])
-            assert all(map(has_voice, ['foreign1', 'foreign2', 'native']))
-
-        self.sounds = AudioJingles(self.sounds)
-        self.sampler = PhraseExamples(app_config)
-
+class ChunkDemultiplexor:
+    def __init__(self, app_config, sequencer, encode_queue, only_wav):
         self.text_builder = TextBuilder(app_config)
+        self.sequencer = sequencer
+        self.sounds = AudioJingles(app_config['jingles'])
+        self.text_jingles = app_config['text_jingles']
+        self.only_wav = only_wav
+        self.encode_queue = encode_queue
 
     def _start_conversion_process(self, language_pair, fn):
         self.encode_queue.put((language_pair, fn))
@@ -73,45 +47,83 @@ class AudioBuilder:
         engine.AudioOutputStream = stream
         return engine, stream
 
-    def _search_excerpt(self, foreign_name, word):
-        if ' ' in word or foreign_name not in self.app_config['phraseExamples']:
-            return None
-        example = self.sampler.get_excerpt(word, foreign_name)
-        if example is None:
-            # Try to find an example for lemmatized (stemmed) form
-            base_forms = self.sampler.lemmatize(word)
-            for base_form in base_forms:
-                example = self.sampler.get_excerpt(base_form, foreign_name)
-                if example:
-                    break
-        return example
-
-    def make_audio_track(self, language_pair, lines, track_num):
-        engine, stream = self._get_engine(language_pair, track_num)
+    def start_section(self, language_pair, track_num):
+        self.language_pair = language_pair
+        self.track_num = track_num
+        self.engine, self.stream = self._get_engine(language_pair, track_num)
         self.text_builder.open(language_pair, track_num)
 
-        def speak(text):
-            engine.Speak(text)
-            if voice_num == 1:
-                self.text_builder.speak(text)
+    def stop_section(self):
+        self.stream.Close()
+        if not self.only_wav:
+            self._start_conversion_process(self.language_pair, self.track_num)
 
-        def speak_postprocess(text):
-            if voice_num == 1:
-                self.text_builder.speak_with_postprocess(text, language_pair)
-
-        wf = stream.Format.GetWaveFormatEx()
+    def get_time(self):
+        wf = self.stream.Format.GetWaveFormatEx()
         stream_position_divider = int(wf.SamplesPerSec * (wf.BitsPerSample // 8))
+        stream_position_bytes = self.stream.Seek(0, SpeechStreamSeekPositionType.SSSPTRelativeToCurrentPosition)
+        stream_position_seconds = stream_position_bytes // stream_position_divider
+        return stream_position_seconds
 
-        def speak_jingle(jingle_name):
-            if jingle_name == 'timestamp':
-                stream_position_bytes = stream.Seek(0, SpeechStreamSeekPositionType.SSSPTRelativeToCurrentPosition)
-                stream_position_seconds = stream_position_bytes // stream_position_divider
-                t = datetime.utcfromtimestamp(stream_position_seconds)
-                self.text_builder.speak(f'{t.strftime("%H:%M:%S")}\n')
-                return
-            engine.SpeakStream(self.sounds[jingle_name])
-            if voice_num == 1:
-                self.text_builder.speak_jingle(jingle_name)
+    def speak_jingle(self, chunk):
+        jingle_name = chunk.jingle
+        if jingle_name == 'timestamp' and chunk.printable:
+            t = datetime.utcfromtimestamp(self.get_time())
+            self.text_builder.speak(f'{t.strftime("%H:%M:%S")}\n')
+            return
+        if chunk.audible:
+            self.engine.SpeakStream(self.sounds[jingle_name])
+        if chunk.printable:
+            self.text_builder.speak(self.text_jingles[jingle_name])
+
+    def speak_audio(self, chunk: Chunk):
+        if isinstance(chunk, SpeechChunk):
+            self.engine.Rate = chunk.rate
+            self.engine.Volume = chunk.volume
+            self.engine.Voice = chunk.voice
+        self.engine.Speak(chunk.text)
+
+    def feed(self, chunk: Chunk):
+        if isinstance(chunk, TextChunk):
+            if chunk.audible:
+                self.speak_audio(chunk)
+            if chunk.printable:
+                self.text_builder.speak(chunk.text)
+        elif isinstance(chunk, JingleChunk):
+            self.speak_jingle(chunk)
+
+
+class AudioBuilder:
+    def __init__(self, *, app_config, encode_queue, only_wav):
+        languages = app_config['languages']
+        self.app_config = app_config
+
+        self.info_engine = CreateObject("SAPI.SpVoice")
+        self.voices = dict()
+
+        self.voices_com = voices = self.info_engine.GetVoices()
+        for language_pair in languages:
+            self.voices[language_pair] = dict()
+
+            foreign_name, native_name = split_name_pair(language_pair)
+            self.voices[language_pair]['native_name'] = native_name
+            self.voices[language_pair]['foreign_name'] = foreign_name
+
+            for purpose in languages[language_pair]:
+                for i in range(voices.Count):
+                    desc = voices.Item(i).GetDescription()
+                    if desc.find(languages[language_pair][purpose]) != -1:
+                        self.voices[language_pair][purpose] = i
+
+            has_voice = partial(contains, self.voices[language_pair])
+            assert all(map(has_voice, ['foreign1', 'foreign2', 'native']))
+
+        self.phrase_examples = PhraseExamples(app_config)
+        self.sequencer = Sequencer()
+        self.chunk_demultiplexor = ChunkDemultiplexor(app_config, self.sequencer, encode_queue, only_wav)
+
+    def make_audio_track(self, language_pair, lines, track_num):
+        self.chunk_demultiplexor.start_section(language_pair, track_num)
 
         for word, trans in lines:
             if language_pair not in self.app_config['languages']:
@@ -120,91 +132,77 @@ class AudioBuilder:
             native_name = self.voices[language_pair]['native_name']
             foreign_name = self.voices[language_pair]['foreign_name']
 
-            speak_jingle('timestamp')
-
             # Say a phrase with both male and female narrators
             for voice_num in range(1, 3):
-                engine.Rate = -6
-                engine.Volume = 100
-                engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                speak(f'{word}.')
+                first_pass = voice_num == 1
 
-                speak_jingle('silence')
+                if first_pass:
+                    self.sequencer.append(JingleChunk(jingle='timestamp'))
 
-                engine.Rate = 0
-                engine.Volume = 80
-                engine.Voice = self.voices_com.Item(self.voices[language_pair]['native'])
+                voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                self.sequencer.append(SpeechChunk(text=word, rate=-6, volume=100, voice=voice, printable=first_pass))
+                self.sequencer.append(JingleChunk(jingle='silence', printable=first_pass))
+
                 if trans:
-                    speak(f'{trans}.')
-                    speak_jingle('silence_long')
+                    voice = self.voices_com.Item(self.voices[language_pair]['native'])
+                    self.sequencer.append(SpeechChunk(text=trans, language=native_name,
+                                                      rate=0, volume=80, voice=voice, printable=first_pass))
+                    self.sequencer.append(JingleChunk(jingle='silence', printable=first_pass))
 
-                speak_postprocess(word)
+                self.sequencer.append(JingleChunk(jingle='silence_long', printable=first_pass))
 
-            word_info = self.sampler.get_definitions_and_examples(word, foreign_name)
+            word_info = self.phrase_examples.get_definitions_and_examples(word, foreign_name)
             if word_info:
                 for voice_num in range(1, 3):
+                    first_pass = voice_num == 1
+
                     for definition in word_info.definitions:
-                        engine.Volume = 50
-                        speak_jingle('definition')
-                        speak_jingle('silence')
-                        engine.Volume = 100
-                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                        speak(definition + '.')
-                        speak_jingle('silence_long')
+                        voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        if not isinstance(definition, JingleChunk):
+                            definition = definition.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                        definition.printable = first_pass
+                        self.sequencer.append(definition)
 
                     for example in word_info.examples:
-                        engine.Volume = 50
-                        speak_jingle('usage_example')
-                        speak_jingle('silence')
-                        engine.Rate = 0
-                        engine.Volume = 100
-                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                        speak(example)
-                        speak_jingle('silence_long')
+                        if not isinstance(example, JingleChunk):
+                            if example.language == foreign_name:
+                                voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                            else:
+                                voice = self.voices_com.Item(self.voices[language_pair]['native'])
+                            example = example.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                        example.printable = first_pass
+                        self.sequencer.append(example)
 
                     for synonym in word_info.synonyms:
-                        engine.Volume = 50
-                        speak_jingle('synonym')
-                        speak_jingle('silence')
-                        engine.Rate = 0
-                        engine.Volume = 100
-                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                        if foreign_name == 'japanese':
-                            synonym = jp_reverse(synonym)
-                        speak(synonym)
-                        speak_jingle('silence_long')
+                        voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        if not isinstance(synonym, JingleChunk):
+                            synonym = synonym.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                        synonym.printable = first_pass
+                        self.sequencer.append(synonym)
 
                     for antonym in word_info.antonyms:
-                        engine.Volume = 50
-                        speak_jingle('antonym')
-                        speak_jingle('silence')
-                        engine.Rate = 0
-                        engine.Volume = 100
-                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                        if foreign_name == 'japanese':
-                            antonym = jp_reverse(antonym)
-                        speak(antonym)
-                        speak_jingle('silence_long')
+                        voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                        if not isinstance(antonym, JingleChunk):
+                            antonym = antonym.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                        antonym.printable = first_pass
+                        self.sequencer.append(antonym)
 
-                    excerpt = self._search_excerpt(foreign_name, word)
-                    if excerpt is not None:
-                        engine.Volume = 50
-                        speak_jingle('excerpt')
-                        speak_jingle('silence')
+                    excerpts = self.phrase_examples.search_excerpt(self.app_config, foreign_name, word)
+                    if excerpts is not None:
+                        for excerpt in excerpts:
+                            if not isinstance(excerpt, JingleChunk):
+                                if excerpt.language == foreign_name:
+                                    voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                                else:
+                                    voice = self.voices_com.Item(self.voices[language_pair]['native'])
+                                excerpt = excerpt.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                            excerpt.printable = first_pass
+                            self.sequencer.append(excerpt)
 
-                        engine.Rate = 0
-                        engine.Volume = 100
-                        engine.Voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                        speak(excerpt)
-                        speak_jingle('silence_long')
+            self.sequencer.append(JingleChunk(jingle='silence_long'))
+            self.sequencer.append(JingleChunk(jingle='silence_long', printable=False))
 
-                        speak_postprocess(excerpt)
+            while len(self.sequencer):
+                self.chunk_demultiplexor.feed(self.sequencer.pop())
 
-            voice_num = 1
-            speak_jingle('silence_long')
-            speak_jingle('silence_long')
-
-        stream.Close()
-        if not self.only_wav:
-            self._start_conversion_process(language_pair, track_num)
-
+        self.chunk_demultiplexor.stop_section()

@@ -1,6 +1,9 @@
 import pickle
 from os.path import exists, abspath
 from abc import ABC, abstractmethod
+from typing import Tuple, List
+
+from src.utils.config import split_name_pair
 
 
 class BaseDictionary(ABC):
@@ -13,9 +16,10 @@ class BaseDictionary(ABC):
         self.file_path = file_path
         self.cache_id_header = cache_id_header
         self.language_pair = None  # filled by load()
+        self.foreign_language, self.native_language = None, None  # filled by load()
 
     @abstractmethod
-    def get_examples(self, word):
+    def get_examples(self, word) -> List[Tuple[str, str]]:
         ...
 
     def translate_word(self, word):
@@ -52,6 +56,7 @@ class BaseDictionary(ABC):
         else:
             raise Exception('Wrong dictionary type')
         dictionary.language_pair = language_pair
+        dictionary.foreign_language, dictionary.native_language = split_name_pair(language_pair)
         return dictionary
 
     @staticmethod

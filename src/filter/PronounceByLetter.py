@@ -1,4 +1,4 @@
-from src.Sampler import Chunk, JingleChunk
+from src.Sequencer import Chunk, JingleChunk
 from src.filter.BaseFilter import BaseFilter
 from re import search
 

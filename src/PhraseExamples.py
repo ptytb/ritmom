@@ -1,10 +1,14 @@
 from collections import namedtuple
+from itertools import chain, repeat, cycle
+
 from nltk import WordNetLemmatizer
 from nltk.corpus import wordnet
 from word_forms.word_forms import get_word_forms
 
+from src.Sequencer import TextChunk, as_chunks, JingleChunk
 from src.Translator import Translator
 from src.WordNetCache import WordNetCache
+from src.utils.lists import flatten
 
 
 class PhraseExamples:
@@ -75,6 +79,10 @@ class PhraseExamples:
             "japanese": "jpn",
         }
 
+        appendix = [
+            JingleChunk(jingle='silence_long')
+        ]
+
         def lemma_word(lemma_name):
             return lemma_name.split('.')[0]
 
@@ -87,10 +95,34 @@ class PhraseExamples:
             lemmas = [l for l in all_lemmas if lemma_name(l).startswith(word_en)]  # skip 'Lemma('
             # lemmas = [l for l in all_lemmas if l.name() == word]
             synsets = [l.synset() for l in lemmas]
+
+            jingles = [
+                JingleChunk(jingle='definition', volume=50),
+                JingleChunk(jingle='silence')
+            ]
             definitions = [s.definition() for s in synsets]
+            definitions = as_chunks(definitions, language=language, prepend=jingles, append=appendix)
+
+            jingles = [
+                JingleChunk(jingle='usage_example', volume=50),
+                JingleChunk(jingle='silence')
+            ]
             examples = [e for s in synsets for e in s.examples() if word in e]
-            antonyms = list({a.name() for l in lemmas for a in l.antonyms()})
-            synonyms = list({lemma_word(s.name()) for s in synsets} - {word})
+            examples = as_chunks(examples, language=language, prepend=jingles, append=appendix)
+
+            jingles = [
+                JingleChunk(jingle='antonym', volume=50),
+                JingleChunk(jingle='silence')
+            ]
+            antonyms = {a.name() for l in lemmas for a in l.antonyms()}
+            antonyms = as_chunks(antonyms, language, prepend=jingles, append=appendix)
+
+            jingles = [
+                JingleChunk(jingle='synonym', volume=50),
+                JingleChunk(jingle='silence')
+            ]
+            synonyms = {lemma_word(s.name()) for s in synsets} - {word}
+            synonyms = as_chunks(synonyms, language, prepend=jingles, append=appendix)
         else:
             # definitions, examples, synonyms, antonyms = (list(),) * 4
             definitions, examples, synonyms, antonyms = [], [], [], []
@@ -101,10 +133,37 @@ class PhraseExamples:
         #     examples = [example for examples in [synset.examples() for synset in synsets] for example in examples]
         #     definitions = [s.definition() for s in synsets]
 
+        jingles = [
+            JingleChunk(jingle='usage_example', volume=50),
+            JingleChunk(jingle='silence')
+        ]
+
         thesaurus_lang = language.capitalize()
         thesaurus_definition = self.translator.translate(word, f'{thesaurus_lang}{thesaurus_lang}')
-        if thesaurus_definition:
-            definitions.append(thesaurus_definition)
-        examples += self.translator.get_examples(word, language)
+        thesaurus_definitions = [thesaurus_definition] if thesaurus_definition else []
+        thesaurus_definitions = as_chunks(thesaurus_definitions, language, prepend=jingles, append=appendix)
 
-        return self.WordInfo(definitions, examples, synonyms, antonyms)
+        examples_with_jingles = flatten([[jingles, zip(repeat(JingleChunk(jingle='silence')), exs), appendix]
+                                         for exs in self.translator.get_examples(word, language)])
+
+        examples = chain(examples, thesaurus_definitions, examples_with_jingles)
+
+        return self.WordInfo(*map(list, [definitions, examples, synonyms, antonyms]))
+
+    def search_excerpt(self, app_config, foreign_name, word):
+        if ' ' in word or foreign_name not in app_config['phraseExamples']:
+            return None
+        example = self.get_excerpt(word, foreign_name)
+        if example is None:
+            # Try to find an example for lemmatized (stemmed) form
+            base_forms = self.lemmatize(word)
+            for base_form in base_forms:
+                example = self.get_excerpt(base_form, foreign_name)
+                if example:
+                    break
+        return [
+            JingleChunk(jingle='excerpt'),
+            JingleChunk(jingle='silence'),
+            TextChunk(text=example, language=foreign_name),
+            JingleChunk(jingle='silence_long')
+        ] if example else None

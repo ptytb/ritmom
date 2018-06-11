@@ -1,8 +1,10 @@
-from collections import deque
+from collections import deque, Iterable
+from copy import deepcopy, copy
 from typing import Deque, List
 import attr
 
 from src.filter import BaseFilter
+from src.utils.lists import flatten
 
 
 def make_range_validator(low, high):
@@ -12,13 +14,37 @@ def make_range_validator(low, high):
     return validate
 
 
+def as_chunks(items: Iterable, language, prepend: List, append: List = list()):
+    for item in items:
+        yield from prepend
+        yield TextChunk(text=item, language=language)
+        yield from append
+
+
 @attr.s
 class Chunk:
-    text = attr.ib(type=str, default=None)
-    language = attr.ib(type=str, default=None)
     audible = attr.ib(type=bool, default=True)
     printable = attr.ib(type=bool, default=True)
     final = attr.ib(type=bool, default=False)  # Whether chunk can be filtered to let derived chunks be generated
+
+    def promote(self, target_class, **changes):
+        assert issubclass(target_class, self.__class__)
+        cls = target_class
+        attributes = attr.fields(cls)
+        for a in attributes:
+            if not a.init:
+                continue
+            attr_name = a.name  # To deal with private attributes.
+            init_name = attr_name if attr_name[0] != "_" else attr_name[1:]
+            if init_name not in changes:
+                changes[init_name] = getattr(self, attr_name, a.default)
+        return cls(**changes)
+
+
+@attr.s
+class TextChunk(Chunk):
+    text = attr.ib(type=str, default=None)
+    language = attr.ib(type=str, default=None)
 
 
 @attr.s
@@ -32,13 +58,15 @@ class AudioChunk(Chunk):
 
 
 @attr.s
-class SpeechChunk(AudioChunk):
-    voice = attr.ib(type=str, default=None)
+class SpeechChunk(AudioChunk, TextChunk):
+    voice = attr.ib(default=None)
+    final = attr.ib(type=bool, default=True)
 
 
 @attr.s
 class JingleChunk(AudioChunk):
     jingle = attr.ib(type=str, default=None)
+    final = attr.ib(type=bool, default=True)
 
 
 class ChunkProcessor:
@@ -60,13 +88,18 @@ class ChunkProcessor:
         return result
 
 
-class Sampler:
+class Sequencer:
     def __init__(self):
         self.queue: Deque[Chunk] = deque()
         self.chunk_processor = ChunkProcessor()
 
     def append(self, chunk: Chunk):
-        self.queue.extendleft(self.chunk_processor.apply_filters(chunk))
+        flat = flatten([attr.evolve(chunk)])  # copy as an alternative to immutability
+        for chunk in flat:
+            self.queue.extendleft(self.chunk_processor.apply_filters(chunk))
+
+    def __len__(self):
+        return len(self.queue)
 
     def pop(self):
         return self.queue.pop()

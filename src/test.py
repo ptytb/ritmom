@@ -1,17 +1,23 @@
 import unittest
-from os.path import pardir, pathsep
+from json import load
+from os.path import pardir, pathsep, abspath
 from sys import modules
 
-from src.Sampler import Chunk, ChunkProcessor
+from pathtools.path import parent_dir_path
+
+from src.PhraseExamples import PhraseExamples
+from src.Sequencer import Chunk, ChunkProcessor, TextChunk, SpeechChunk
 from src.dictionary.LdxDictionary import LdxBaseDictionary
 from src.dictionary.DslDictionary import DslBaseDictionary
 from src.filter.AddFurigana import AddFurigana
 from src.filter.ExplainJapaneseSentences import ExplainJapaneseSentences
 from src.filter.ExplainKanji import ExplainKanji
 from src.filter.PronounceByLetter import PronounceByLetter
+from src.filter.SimilarKanji import jp_reverse
 from src.filter.StubFinalizer import StubFinalizer
 from src.filter.TidyUpEnglish import TidyUpEnglish
-from src.postprocessing.lang_jp_reverse import jp_reverse
+
+from src.utils.config import split_name_pair
 
 
 class TestDictionaryReaders(unittest.TestCase):
@@ -50,29 +56,51 @@ class TestDictionaryReaders(unittest.TestCase):
         # self.assertNotRegex(dsl.translate_word('tangerine'), 'rine')
 
     def test_chunk_preprocessing(self):
-        c0 = Chunk(text='"some guy\'s bad text {', language='english', audible=True, printable=True, final=False)
+        c0 = TextChunk(text='"some guy\'s bad text {', language='english', audible=True, printable=True, final=False)
         p0 = ChunkProcessor(filters=[TidyUpEnglish(), StubFinalizer()])
         result0 = p0.apply_filters(c0)
 
-        c1 = Chunk(text='知りません', language='japanese', audible=False, printable=True, final=False)
+        c1 = TextChunk(text='知りません', language='japanese', audible=False, printable=True, final=False)
         p1 = ChunkProcessor(filters=[ExplainKanji(), StubFinalizer()])
         result1 = p1.apply_filters(c1)
 
-        c2 = Chunk(text='faux pas', language='english', audible=True, printable=True, final=False)
+        c2 = TextChunk(text='faux pas', language='english', audible=True, printable=True, final=False)
         p2 = ChunkProcessor(filters=[TidyUpEnglish(), PronounceByLetter(), StubFinalizer()])
         result2 = p2.apply_filters(c2)
 
-        c3 = Chunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
+        c3 = TextChunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
         p3 = ChunkProcessor(filters=[ExplainJapaneseSentences(), StubFinalizer()])
         result3 = p3.apply_filters(c3)
 
-        c4 = Chunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
+        c4 = TextChunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
         p4 = ChunkProcessor(filters=[AddFurigana(), StubFinalizer()])
         result4 = p4.apply_filters(c4)
 
         r = jp_reverse('知')
 
         pass
+
+    def test_split(self):
+        a, b = split_name_pair('EnglishJapanese')
+        self.assertEqual(a, 'english')
+        self.assertEqual(b, 'japanese')
+
+    def test_promote(self):
+        a = TextChunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
+        b = a.promote(SpeechChunk, volume=75)
+
+    def test_examples(self):
+        ritmom_root = parent_dir_path(parent_dir_path(abspath(__file__)))
+
+        with open(f'{ritmom_root}/config.json') as f:
+            config = load(f)
+        pe = PhraseExamples(config)
+        wi = pe.get_definitions_and_examples('black', 'english')
+
+        print(list(wi.definitions))
+        print(list(wi.antonyms))
+        print(list(wi.synonyms))
+        print(list(wi.examples))
 
 
 if __name__ == '__main__':

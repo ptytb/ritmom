@@ -1,7 +1,7 @@
 import jaconv
 import sys
 
-from src.Sampler import Chunk
+from src.Sequencer import Chunk, TextChunk
 
 sys.__stdout__ = sys.stdout
 from cihai.core import Cihai
@@ -26,12 +26,12 @@ class ExplainKanji(BaseFilter):
         explanations = self._get_explanations(chunk.text)
 
         for k, on, kun, explanation in explanations:
-            result.append(Chunk(text=k, language='japanese', audible=False, printable=True, final=True))
-            result.append(Chunk(text='on', language='english', audible=True, printable=False, final=True))
-            result.append(Chunk(text=on, language='japanese', audible=True, printable=True, final=True))
-            result.append(Chunk(text='koon', language='english', audible=True, printable=False, final=True))
-            result.append(Chunk(text=kun, language='japanese', audible=True, printable=True, final=True))
-            result.append(Chunk(text=explanation, language='english', audible=True, printable=True, final=True))
+            result.append(TextChunk(text=k, language='japanese', audible=False, printable=True, final=True))
+            result.append(TextChunk(text='on', language='english', audible=True, printable=False, final=True))
+            result.append(TextChunk(text=on, language='japanese', audible=True, printable=True, final=True))
+            result.append(TextChunk(text='koon', language='english', audible=True, printable=False, final=True))
+            result.append(TextChunk(text=kun, language='japanese', audible=True, printable=True, final=True))
+            result.append(TextChunk(text=explanation, language='english', audible=True, printable=True, final=True))
 
         return result
 

@@ -1,6 +1,5 @@
 from os import mkdir
 from sys import modules
-from src.postprocessing import *
 
 
 class TextBuilder:

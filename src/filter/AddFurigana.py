@@ -1,6 +1,6 @@
 from furigana.furigana import split_furigana
 
-from src.Sampler import Chunk
+from src.Sequencer import Chunk, TextChunk
 from src.filter.BaseFilter import BaseFilter
 
 
@@ -14,9 +14,9 @@ class AddFurigana(BaseFilter):
         result = [chunk]
         tokens = self.tokenize(chunk.text)
         for t in tokens:
-            result.append(Chunk(text=t[0], language='japanese', audible=False, printable=True, final=True))
+            result.append(TextChunk(text=t[0], language='japanese', audible=False, printable=True, final=True))
             if len(t) > 1:
-                result.append(Chunk(text=t[1], language='japanese', audible=False, printable=True, final=True))
+                result.append(TextChunk(text=t[1], language='japanese', audible=False, printable=True, final=True))
 
         return result
 

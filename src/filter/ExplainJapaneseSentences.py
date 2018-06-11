@@ -1,4 +1,4 @@
-from src.Sampler import Chunk
+from src.Sequencer import Chunk, TextChunk
 from src.filter.BaseFilter import BaseFilter
 
 from os.path import abspath
@@ -25,7 +25,7 @@ class ExplainJapaneseSentences(BaseFilter):
 
         result = [chunk]
         text = self.tokenize(chunk.text)
-        result.append(Chunk(text=text, language='japanese', audible=False, printable=True, final=True))
+        result.append(TextChunk(text=text, language='japanese', audible=False, printable=True, final=True))
         return result
 
     def tokenize(self, text):
