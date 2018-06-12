@@ -4,6 +4,8 @@ from typing import List
 
 
 class BaseFilter:
+    def __init__(self):
+        self.enabled = True
 
     @abstractmethod
     def __call__(self, chunk):

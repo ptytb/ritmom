@@ -9,6 +9,8 @@ from rakutenma import RakutenMA
 class ExplainJapaneseSentences(BaseFilter):
 
     def __init__(self):
+        super().__init__()
+        
         # Initialize a RakutenMA instance with an empty model
         # the default ja feature set is set already
         self.rma = RakutenMA()

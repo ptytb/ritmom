@@ -10,6 +10,8 @@ from src.filter.BaseFilter import BaseFilter
 
 class ExplainKanji(BaseFilter):
     def __init__(self):
+        super().__init__()
+        
         self.c = Cihai()
 
         if not self.c.is_bootstrapped:  # download and install Unihan to db

@@ -3,6 +3,7 @@ from typing import Deque, List
 import attr
 
 from src.filter.AddFurigana import AddFurigana
+from src.filter.BaseFilter import BaseFilter
 from src.filter.ExplainKanji import ExplainKanji
 from src.filter.PronounceByLetter import PronounceByLetter
 from src.filter.StubFinalizer import StubFinalizer
@@ -45,6 +46,16 @@ class Chunk:
 
 
 @attr.s
+class ControlChunk(Chunk):
+    target = attr.ib(type=BaseFilter)  # Which filter we want to control
+    attribute = attr.ib(type=str)
+    value = attr.ib()
+    audible = attr.ib(type=bool, default=False)
+    printable = attr.ib(type=bool, default=False)
+    final = attr.ib(type=bool, default=True)
+
+
+@attr.s
 class TextChunk(Chunk):
     text = attr.ib(type=str, default=None)
     language = attr.ib(type=str, default=None)
@@ -81,6 +92,8 @@ class ChunkProcessor:
 
         while not result_is_final:
             for f in self.filters:
+                if not f.enabled:
+                    continue
                 new_result = list()
                 for chunk in result:
                     new_result.extend([chunk] if chunk.final or not isinstance(chunk, TextChunk) else f(chunk))
@@ -102,6 +115,15 @@ class Sequencer:
         ])
 
     def append(self, chunk: Chunk):
+        if isinstance(chunk, ControlChunk):
+            if issubclass(chunk.target, BaseFilter):
+                for f in self.chunk_processor.filters:
+                    if isinstance(f, chunk.target):
+                        setattr(f, chunk.attribute, chunk.value)
+                        return
+            else:
+                return
+                
         flat = flatten([attr.evolve(chunk)])  # copy as an alternative to immutability
         for chunk in flat:
             self.queue.extendleft(self.chunk_processor.apply_filters(chunk))
@@ -110,4 +132,7 @@ class Sequencer:
         return len(self.queue)
 
     def pop(self):
-        return self.queue.pop()
+        chunk = self.queue.pop()
+        if isinstance(chunk, ControlChunk):
+            chunk = None
+        return chunk

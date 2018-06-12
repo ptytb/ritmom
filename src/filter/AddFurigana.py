@@ -4,6 +4,9 @@ from src.filter.BaseFilter import BaseFilter
 
 
 class AddFurigana(BaseFilter):
+    
+    def __init__(self):
+        super().__init__()
 
     def __call__(self, chunk):
         from src.Sequencer import TextChunk

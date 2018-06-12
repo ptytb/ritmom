@@ -3,6 +3,10 @@ from re import sub
 
 
 class TidyUpText(BaseFilter):
+    
+    def __init__(self):
+        super().__init__()
+
     def __call__(self, chunk):
         from src.Sequencer import TextChunk
         chunk = self._duplicate_chunk(chunk)

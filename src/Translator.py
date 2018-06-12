@@ -1,7 +1,7 @@
 from functools import partial
 from typing import List, Dict
 
-from src.Sequencer import TextChunk
+from src.Sequencer import TextChunk, JingleChunk
 from src.dictionary.BaseDictionary import BaseDictionary
 from src.utils.singleton import Singleton
 
@@ -53,15 +53,17 @@ class Translator(metaclass=Singleton):
 
     def get_examples(self, word, language):
 
-        def example_pair(foreign, native, pair):
-            foreign = TextChunk(text=pair[0].strip(), language=foreign)
-            native = TextChunk(text=pair[1].strip(), language=native)
-            return foreign, native
+        def example_sequence(foreign, native, pair):
+            return [
+                TextChunk(text=pair[0].strip(), language=foreign),
+                JingleChunk(jingle='silence'),
+                TextChunk(text=pair[1].strip(), language=native)
+            ]
 
         examples = list()
         for d in self.all_dictionaries:
             if d.language_pair.startswith(language.capitalize()):
-                to_chunks = partial(example_pair, d.foreign_language, d.native_language)
+                to_chunks = partial(example_sequence, d.foreign_language, d.native_language)
                 examples += map(to_chunks, d.get_examples(word))
 
         return examples

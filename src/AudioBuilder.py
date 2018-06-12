@@ -9,9 +9,10 @@ from comtypes.client import CreateObject
 from datetime import datetime
 
 from src.AudioJingles import AudioJingles
-from src.Sequencer import Sequencer, TextChunk, Chunk, JingleChunk, SpeechChunk, AudioChunkMixin
+from src.Sequencer import Sequencer, TextChunk, Chunk, JingleChunk, SpeechChunk, AudioChunkMixin, ControlChunk
 from src.TextBuilder import TextBuilder
 from src.PhraseExamples import PhraseExamples
+from src.filter.PronounceByLetter import PronounceByLetter
 
 from src.utils.config import split_name_pair
 from src.utils.term_progress import print_progressbar
@@ -144,8 +145,10 @@ class AudioBuilder:
                     self.sequencer.append(JingleChunk(jingle='timestamp'))
 
                 voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
+                self.sequencer.append(ControlChunk(target=PronounceByLetter, attribute='enabled', value=True))
                 self.sequencer.append(SpeechChunk(text=word, language=foreign_name, final=not first_pass,
                                                   rate=-6, volume=100, voice=voice, printable=first_pass))
+                self.sequencer.append(ControlChunk(target=PronounceByLetter, attribute='enabled', value=False))
                 self.sequencer.append(JingleChunk(jingle='silence_long', printable=first_pass))
 
                 if trans:
@@ -177,7 +180,7 @@ class AudioBuilder:
                                 volume = 100
                             else:
                                 voice = self.voices_com.Item(self.voices[language_pair]['native'])
-                                volume = 50
+                                volume = 75
                             example = example.promote(SpeechChunk, rate=0, volume=volume, voice=voice, final=True)
                             example.final = not first_pass
                         example.printable = first_pass
@@ -215,6 +218,8 @@ class AudioBuilder:
         self.sequencer.append(JingleChunk(jingle='end_of_part', volume=20))
 
         while len(self.sequencer):
-            self.chunk_demultiplexor.feed(self.sequencer.pop())
+            chunk = self.sequencer.pop()
+            if chunk:
+                self.chunk_demultiplexor.feed(chunk)
 
         self.chunk_demultiplexor.stop_section()

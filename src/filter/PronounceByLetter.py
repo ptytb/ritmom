@@ -3,6 +3,9 @@ from re import search
 
 
 class PronounceByLetter(BaseFilter):
+    
+    def __init__(self):
+        super().__init__()
 
     def __call__(self, chunk):
         from src.Sequencer import JingleChunk, TextChunk
