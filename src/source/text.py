@@ -13,10 +13,10 @@ class TextSource:
         return self
 
     def __next__(self):
-        with open(self.source, 'rt', newline='', errors='replace', encoding='utf-8') as f:
+        with open(self.source, 'rt', errors='replace', encoding='utf-8') as f:
             for line in f:
+                line = line.strip()
                 if line == '':
                     continue
-                word = line.strip()
-                trans = self.translator.translate(word, self.language_pair)
-                yield word, trans
+                trans = self.translator.translate(line, self.language_pair)
+                yield line, trans

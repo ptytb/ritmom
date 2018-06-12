@@ -15,6 +15,7 @@ from src.filter.PronounceByLetter import PronounceByLetter
 from src.filter.SimilarKanji import jp_reverse
 from src.filter.StubFinalizer import StubFinalizer
 from src.filter.TidyUpEnglish import TidyUpEnglish
+from src.filter.TidyUpText import TidyUpText
 
 from src.utils.config import split_name_pair
 
@@ -78,6 +79,10 @@ class TestDictionaryReaders(unittest.TestCase):
         result4 = p4.apply_filters(c4)
 
         r = jp_reverse('知')
+        
+        c5 = TextChunk(text='some_bad_formatting{going}here()', language='japanese', audible=True, printable=True, final=False)
+        p5 = ChunkProcessor(filters=[TidyUpText(), StubFinalizer()])
+        result5 = p5.apply_filters(c5)
 
         pass
 

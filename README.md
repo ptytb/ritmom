@@ -60,6 +60,7 @@ Supported dictionary formats:
 
 ## TODO
 
+- [ ] Fix TidyUpText filter
 - [ ] Download and cache required resources (dictionaries, pre-trained models, etc)
 - [X] Use TextChunk instead of plain text
 - [X] Extract examples from offline dictionaries

@@ -34,7 +34,7 @@ class Translator(metaclass=Singleton):
             self.all_dictionaries.append(dictionary)
 
     def translate(self, phrase, language_pair=None):
-        if language_pair:
+        if language_pair and language_pair in self.dictionaries:
             dictionaries = self.dictionaries[language_pair]
         else:
             dictionaries = self.all_dictionaries

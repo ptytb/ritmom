@@ -1,8 +1,6 @@
 import jaconv
 import sys
 
-from src.Sequencer import Chunk, TextChunk
-
 sys.__stdout__ = sys.stdout
 from cihai.core import Cihai
 from cihai.bootstrap import bootstrap_unihan
@@ -19,19 +17,40 @@ class ExplainKanji(BaseFilter):
             self.c.reflect_db()
 
     def __call__(self, chunk):
+        from src.Sequencer import TextChunk, JingleChunk
+        
         chunk = self._duplicate_chunk(chunk)
-        chunk.final = True
         result = [chunk]
+        
+        if not isinstance(chunk, TextChunk) or chunk.language != 'japanese':
+            return result
 
         explanations = self._get_explanations(chunk.text)
+        
+        result.append(TextChunk(text='[', audible=False, printable=True, final=True))
 
-        for k, on, kun, explanation in explanations:
+        for k, ons, kuns, explanation in explanations:
             result.append(TextChunk(text=k, language='japanese', audible=False, printable=True, final=True))
+            
             result.append(TextChunk(text='on', language='english', audible=True, printable=False, final=True))
-            result.append(TextChunk(text=on, language='japanese', audible=True, printable=True, final=True))
+            result.append(JingleChunk(jingle='silence'))
+            for on in ons:
+                result.append(TextChunk(text=on, language='japanese', audible=True, printable=True, final=True))
+                result.append(JingleChunk(jingle='silence'))
+                result.append(TextChunk(text='、', audible=False, printable=True, final=True))
+                
             result.append(TextChunk(text='koon', language='english', audible=True, printable=False, final=True))
-            result.append(TextChunk(text=kun, language='japanese', audible=True, printable=True, final=True))
+            result.append(JingleChunk(jingle='silence'))
+            for kun in kuns:
+                result.append(TextChunk(text=kun, language='japanese', audible=True, printable=True, final=True))
+                result.append(JingleChunk(jingle='silence'))
+                result.append(TextChunk(text='、', audible=False, printable=True, final=True))
+
+            result.append(JingleChunk(jingle='definition'))
             result.append(TextChunk(text=explanation, language='english', audible=True, printable=True, final=True))
+            
+        result.append(TextChunk(text=']', audible=False, printable=True, final=True))
+        result.append(JingleChunk(jingle='silence_long', audible=False, printable=True, final=True))
 
         return result
 

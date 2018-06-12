@@ -1,10 +1,11 @@
 from collections import deque, Iterable
-from copy import deepcopy, copy
 from typing import Deque, List
 import attr
 
-from src.filter import BaseFilter
+from src.filter.AddFurigana import AddFurigana
+from src.filter.ExplainKanji import ExplainKanji
 from src.filter.PronounceByLetter import PronounceByLetter
+from src.filter.StubFinalizer import StubFinalizer
 from src.utils.lists import flatten
 from src.filter.TidyUpText import TidyUpText
 
@@ -72,19 +73,19 @@ class JingleChunk(AudioChunkMixin, Chunk):
 
 class ChunkProcessor:
     def __init__(self, filters=list()):
-        self.filters: List[BaseFilter] = filters
+        self.filters = filters
 
     def apply_filters(self, chunk: Chunk) -> List[Chunk]:
         result = [chunk]
-        result_is_not_final = True
+        result_is_final = chunk.final
 
-        while result_is_not_final:
+        while not result_is_final:
             for f in self.filters:
                 new_result = list()
                 for chunk in result:
-                    new_result.extend([chunk] if chunk.final else f(chunk))
+                    new_result.extend([chunk] if chunk.final or not isinstance(chunk, TextChunk) else f(chunk))
                 result = new_result
-            result_is_not_final = any(map(lambda c: not c.final, result))
+            result_is_final = all(map(lambda c: c.final, result))
 
         return result
 
@@ -94,7 +95,10 @@ class Sequencer:
         self.queue: Deque[Chunk] = deque()
         self.chunk_processor = ChunkProcessor(filters=[
             PronounceByLetter(),
-            TidyUpText()
+            AddFurigana(),
+            ExplainKanji(),
+            TidyUpText(),
+            StubFinalizer()
         ])
 
     def append(self, chunk: Chunk):

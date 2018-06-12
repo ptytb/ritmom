@@ -1,16 +1,17 @@
 from furigana.furigana import split_furigana
 
-from src.Sequencer import Chunk, TextChunk
 from src.filter.BaseFilter import BaseFilter
 
 
 class AddFurigana(BaseFilter):
 
-    def __call__(self, chunk: TextChunk):
+    def __call__(self, chunk):
+        from src.Sequencer import TextChunk
+
         chunk = self._duplicate_chunk(chunk)
         result = [chunk]
 
-        if chunk.language == 'japanese':
+        if isinstance(chunk, TextChunk) and chunk.language == 'japanese':
             chunk.printable = False
             tokens = self.tokenize(chunk.text)
             for t in tokens:
@@ -23,6 +24,5 @@ class AddFurigana(BaseFilter):
 
     @staticmethod
     def tokenize(text):
-        tokens = list(map(list, split_furigana(text)))
+        tokens = map(list, split_furigana(text))
         return tokens
-        # return ' '.join(list(map(lambda l: l[0] + (f' ({l[1]})' if len(l) > 1 else ''), tokens)))

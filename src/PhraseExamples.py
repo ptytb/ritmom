@@ -143,7 +143,7 @@ class PhraseExamples:
         thesaurus_definitions = [thesaurus_definition] if thesaurus_definition else []
         thesaurus_definitions = as_chunks(thesaurus_definitions, language, prepend=jingles, append=appendix)
 
-        examples_with_jingles = flatten([[jingles, zip(repeat(JingleChunk(jingle='silence')), exs), appendix]
+        examples_with_jingles = flatten([[jingles, exs, appendix]
                                          for exs in self.translator.get_examples(word, language)])
 
         examples = chain(examples, thesaurus_definitions, examples_with_jingles)

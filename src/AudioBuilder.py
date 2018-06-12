@@ -14,6 +14,7 @@ from src.TextBuilder import TextBuilder
 from src.PhraseExamples import PhraseExamples
 
 from src.utils.config import split_name_pair
+from src.utils.term_progress import print_progressbar
 
 
 class SpeechStreamSeekPositionType(IntEnum):
@@ -143,14 +144,14 @@ class AudioBuilder:
                     self.sequencer.append(JingleChunk(jingle='timestamp'))
 
                 voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
-                self.sequencer.append(SpeechChunk(text=word, language=foreign_name,
+                self.sequencer.append(SpeechChunk(text=word, language=foreign_name, final=not first_pass,
                                                   rate=-6, volume=100, voice=voice, printable=first_pass))
                 self.sequencer.append(JingleChunk(jingle='silence_long', printable=first_pass))
 
                 if trans:
                     trans = '; '.join(sorted(set(map(str.strip, trans.split(';')))))
                     voice = self.voices_com.Item(self.voices[language_pair]['native'])
-                    self.sequencer.append(SpeechChunk(text=trans, language=native_name,
+                    self.sequencer.append(SpeechChunk(text=trans, language=native_name, final=True,
                                                       rate=0, volume=60, voice=voice, printable=first_pass))
                     self.sequencer.append(JingleChunk(jingle='silence', printable=first_pass))
 
@@ -165,6 +166,7 @@ class AudioBuilder:
                         voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
                         if not isinstance(definition, JingleChunk):
                             definition = definition.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                            definition.final = not first_pass
                         definition.printable = first_pass
                         self.sequencer.append(definition)
 
@@ -177,6 +179,7 @@ class AudioBuilder:
                                 voice = self.voices_com.Item(self.voices[language_pair]['native'])
                                 volume = 50
                             example = example.promote(SpeechChunk, rate=0, volume=volume, voice=voice, final=True)
+                            example.final = not first_pass
                         example.printable = first_pass
                         self.sequencer.append(example)
 
@@ -184,6 +187,7 @@ class AudioBuilder:
                         voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
                         if not isinstance(synonym, JingleChunk):
                             synonym = synonym.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                            synonym.final = not first_pass
                         synonym.printable = first_pass
                         self.sequencer.append(synonym)
 
@@ -191,6 +195,7 @@ class AudioBuilder:
                         voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
                         if not isinstance(antonym, JingleChunk):
                             antonym = antonym.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                            antonym.final = not first_pass
                         antonym.printable = first_pass
                         self.sequencer.append(antonym)
 
@@ -200,14 +205,16 @@ class AudioBuilder:
                             if not isinstance(excerpt, JingleChunk):
                                 voice = self.voices_com.Item(self.voices[language_pair][f'foreign{voice_num}'])
                                 excerpt = excerpt.promote(SpeechChunk, rate=0, volume=100, voice=voice, final=True)
+                                excerpt.final = not first_pass
                             excerpt.printable = first_pass
                             self.sequencer.append(excerpt)
 
             self.sequencer.append(JingleChunk(jingle='silence_long'))
             self.sequencer.append(JingleChunk(jingle='silence_long', printable=False))
-            self.sequencer.append(JingleChunk(jingle='end_of_part', volume=20))
 
-            while len(self.sequencer):
-                self.chunk_demultiplexor.feed(self.sequencer.pop())
+        self.sequencer.append(JingleChunk(jingle='end_of_part', volume=20))
+
+        while len(self.sequencer):
+            self.chunk_demultiplexor.feed(self.sequencer.pop())
 
         self.chunk_demultiplexor.stop_section()

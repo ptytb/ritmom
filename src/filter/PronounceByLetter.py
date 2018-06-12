@@ -8,7 +8,6 @@ class PronounceByLetter(BaseFilter):
         from src.Sequencer import JingleChunk, TextChunk
 
         chunk = self._duplicate_chunk(chunk)
-        chunk.final = True
         result = [chunk]
 
         if self._needs_process(chunk.text, chunk.language):
@@ -43,11 +42,12 @@ class PronounceByLetter(BaseFilter):
                 'aw',
                 'kn',
                 'e$',
-                'iae'
+                'iae',
+                'ue'
             ]
         }
 
-        def test_func(pattern):
-            return search(pattern, text)
+        def test_func(pattern) -> bool:
+            return search(pattern, text) is not None
 
         return language in patterns and any(map(test_func, patterns[language]))

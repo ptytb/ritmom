@@ -41,6 +41,12 @@
       "type": "ldx",
       "encoding": "utf-8",
       "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx"
+    },
+    {
+      "pair": "JapaneseEnglish",
+      "type": "ldx",
+      "encoding": "utf-8",
+      "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon Japanese-English Dictionary_7554E7109A40BE41987D0852111EDF4F.ldx"
     }
   ],
   "postprocessing": {
@@ -63,6 +69,10 @@
     }
   ],
   "default": "EnglishRussian",
+  "default_target_language": {
+    "english": "russian",
+    "japanese": "english"
+  },
   "languages": {
     "EnglishRussian": {
       "foreign1": "Salli",
