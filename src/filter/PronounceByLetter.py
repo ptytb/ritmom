@@ -18,7 +18,7 @@ class PronounceByLetter(BaseFilter):
             result.append(JingleChunk(jingle='by_letter', printable=False))
             result.append(JingleChunk(jingle='silence', printable=False))
             for letter in chunk.text:
-                result.append(JingleChunk(jingle='silence', printable=False))
+                result.append(JingleChunk(jingle='silence_short', printable=False))
                 if letter.isspace():
                     result.append(JingleChunk(jingle='space', printable=False))
                 else:
@@ -46,7 +46,10 @@ class PronounceByLetter(BaseFilter):
                 'kn',
                 'e$',
                 'iae',
-                'ue'
+                'ea',
+                'ue',
+                'hir',
+                'ied',
             ]
         }
 

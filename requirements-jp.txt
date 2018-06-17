@@ -3,3 +3,4 @@ rakutenma==0.3.3
 jaconv==0.2.1
 furigana==0.2
 guess==1.0.5
+tinysegmenter==0.3

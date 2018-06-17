@@ -12,4 +12,5 @@ class TidyUpEnglish(BaseFilter):
         chunk.final = True
         if chunk.language == 'english':
             chunk.text = sub(r"^['`\"]+|['`\"]+$", '', chunk.text)
+            chunk.text = sub(r"\s+'\s+", "'", chunk.text)
         return [chunk]

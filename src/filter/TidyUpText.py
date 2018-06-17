@@ -12,6 +12,8 @@ class TidyUpText(BaseFilter):
         chunk = self._duplicate_chunk(chunk)
         if isinstance(chunk, TextChunk):
             chunk.text = sub(r'[\\{}]', ' ', chunk.text)
+            chunk.text = sub(r'/(.*?)/', r'(\1)', chunk.text)
+            chunk.text = sub(r'[/]', '', chunk.text)
             chunk.text = sub(r'_', ' ', chunk.text)
             chunk.text = sub(r'\(\s*\)', ' ', chunk.text)
             chunk.text = sub(r'\s+', ' ', chunk.text)

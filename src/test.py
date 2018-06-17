@@ -9,10 +9,12 @@ from src.PhraseExamples import PhraseExamples
 from src.dictionary.LdxDictionary import LdxBaseDictionary
 from src.dictionary.DslDictionary import DslBaseDictionary
 from src.filter.AddFurigana import AddFurigana
+from src.filter.ExpandContractions import ExpandContractions
 from src.filter.ExplainJapaneseSentences import ExplainJapaneseSentences
 from src.filter.ExplainKanji import ExplainKanji
 from src.filter.PronounceByLetter import PronounceByLetter
 from src.filter.SimilarKanji import jp_reverse
+from src.filter.SplitMixedLanguages import SplitMixedLanguages
 from src.filter.StubFinalizer import StubFinalizer
 from src.filter.TidyUpEnglish import TidyUpEnglish
 from src.filter.TidyUpText import TidyUpText
@@ -67,7 +69,7 @@ class TestDictionaryReaders(unittest.TestCase):
         result1 = p1.apply_filters(c1)
 
         c2 = TextChunk(text='faux pas', language='english', audible=True, printable=True, final=False)
-        p2 = ChunkProcessor(filters=[TidyUpEnglish(), PronounceByLetter(), StubFinalizer()])
+        p2 = ChunkProcessor(filters=[PronounceByLetter(), StubFinalizer()])
         result2 = p2.apply_filters(c2)
 
         c3 = TextChunk(text='財布の中に何もありません', language='japanese', audible=True, printable=True, final=False)
@@ -80,7 +82,7 @@ class TestDictionaryReaders(unittest.TestCase):
 
         r = jp_reverse('知')
         
-        c5 = TextChunk(text='some_bad_formatting{going}here()', language='japanese', audible=True, printable=True, final=False)
+        c5 = TextChunk(text='/in brackets/some_bad_formatting{going}here()', language='japanese', audible=True, printable=True, final=False)
         p5 = ChunkProcessor(filters=[TidyUpText(), StubFinalizer()])
         result5 = p5.apply_filters(c5)
 
@@ -102,12 +104,29 @@ class TestDictionaryReaders(unittest.TestCase):
         with open(f'{ritmom_root}/config.json') as f:
             config = load(f)
         pe = PhraseExamples(config)
-        wi = pe.get_definitions_and_examples('black', 'english')
+        wi = pe.get_definitions_and_examples('stand up', 'english')
 
-        print(list(wi.definitions))
-        print(list(wi.antonyms))
-        print(list(wi.synonyms))
-        print(list(wi.examples))
+        # print(list(wi.definitions))
+        # print(list(wi.antonyms))
+        # print(list(wi.synonyms))
+        # print(list(wi.examples))
+        pass
+        
+    def test_abbr(self):
+        from src.Sequencer import TextChunk, ChunkProcessor
+        a = TextChunk(text='to listen up to smb. and smth.', language='english', audible=True, printable=True, final=False)
+        p0 = ChunkProcessor(filters=[ExpandContractions(), StubFinalizer()])
+        result = p0.apply_filters(a)
+        assert all(map(lambda s: s in result[0].text, ['somebody', 'something']))
+        
+    def test_split_mixed_languages(self):
+        from src.Sequencer import TextChunk, ChunkProcessor
+        a = TextChunk(text='hi there привет こんにちは', language='english', audible=True, printable=True, final=False)
+        p0 = ChunkProcessor(filters=[SplitMixedLanguages(), StubFinalizer()])
+        result = p0.apply_filters(a)
+        assert result[0].language == 'english'
+        assert result[1].language == 'russian'
+        assert result[2].language == 'japanese'
 
 
 if __name__ == '__main__':
