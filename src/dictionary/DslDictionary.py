@@ -1,6 +1,8 @@
+from abc import ABC, abstractmethod
 from collections import deque
 import gzip
 import re
+from typing import List
 
 from src.dictionary.BaseDictionary import BaseDictionary
 from src.utils.gzip_archive import get_uncompressed_size
@@ -48,7 +50,10 @@ class DslMarkup:
     def __getitem__(self, item):
         selector = self.DslMarkupSelector(self.root)
         return selector[item]
-
+    
+    def inner_text(self):
+        return self.DslMarkupSelector._inner_text(self.root)
+    
     @staticmethod
     def _consume_token(text: str):
         tag_pos = text.find('[')
@@ -64,11 +69,20 @@ class DslMarkup:
             tag_parts = re.split(r'\s+', text[1:tag_end_pos])
             tag_name = tag_parts[0]
             is_tag_open = not tag_name.startswith('/')
-            if not is_tag_open:
+
+            attributes = dict()
+            if is_tag_open:
+                for pair in tag_parts[1:]:
+                    eq_pos = pair.find('=')
+                    key = pair[:eq_pos]
+                    value = pair[eq_pos + 1:]
+                    attributes[key] = value.strip('"')
+            else:
                 tag_name = tag_name[1:]  # remove heading '/'
+                
             token = {"type": "tag" if is_tag_open else "tag_close",
                      "tag": tag_name,
-                     "attributes": tag_parts[1 if is_tag_open else 2:]}
+                     "attributes": attributes}
             remainder = text[tag_end_pos+1:]
         else:
             tag_pos = tag_pos if tag_pos != -1 else len(text)
@@ -99,6 +113,81 @@ class DslMarkup:
             elif token['type'] == 'text':
                 root.append(token)
         return true_root
+
+
+class DslMarkupWalker(ABC):
+    def __init__(self, ignore_tags):
+        self._ignore_tags = ignore_tags
+        
+    @abstractmethod
+    def on_begin(self):
+        ...
+    
+    @abstractmethod
+    def on_end(self):
+        ...
+
+    @abstractmethod
+    def on_tag(self, tag, attributes):
+        ...
+
+    @abstractmethod
+    def on_tag_close(self, tag):
+        ...
+
+    @abstractmethod
+    def on_text(self, text):
+        ...
+
+    def _traverse(self, root):
+        for child in root:
+            if child['type'] == 'text':
+                self.on_text(child['value'])
+            elif child['type'] == 'tag' and child['tag'] not in self._ignore_tags:
+                self.on_tag(child['tag'], child['attributes'])
+                self._traverse(child['children'])
+                self.on_tag_close(child['tag'])
+
+    def walk(self, dsl_markup: DslMarkup):
+        self.on_begin()
+        self._traverse(dsl_markup.root)
+        self.on_end()
+
+
+class ChopperWalker(DslMarkupWalker):
+    
+    def __init__(self, ignore_tags, factory, default_language):
+        super().__init__(ignore_tags)
+        self.factory = factory
+        self.default_language = default_language
+        self.chunks = list()
+        self.accumulated_text = ''
+        self.current_language = default_language
+    
+    def _flush_chunk(self):
+        if self.accumulated_text:
+            self.chunks.append(self.factory(language=self.current_language,
+                                            text=self.accumulated_text))
+        self.accumulated_text = ''
+        self.current_language = self.default_language
+
+    def on_begin(self):
+        ...
+
+    def on_end(self):
+        self._flush_chunk()
+
+    def on_tag(self, tag, attributes):
+        if tag == 'lang':
+            self._flush_chunk()
+            self.current_language = attributes['name'].lower()
+
+    def on_tag_close(self, tag):
+        if tag == 'lang':
+            self._flush_chunk()
+
+    def on_text(self, text):
+        self.accumulated_text += text
 
 
 class DslBaseDictionary(BaseDictionary):
@@ -150,20 +239,7 @@ class DslBaseDictionary(BaseDictionary):
         print()
         print(f'Saving cache for {self.dictionary_header["NAME"]}')
         self._save_cache()
-
-    @staticmethod
-    def _filter_formatting(text):
-        dropout_tags = ['b', 'com', r'\*']
-        for tag in dropout_tags:
-            text = re.sub(rf'\[{tag}\].*?\[/{tag}\]', '', text)
-        text = re.sub(r'\d+[.)]\s*', ';', text)  # numbered lists
-        text = re.sub(rf'\\\[.*?\\\]', '', text)  # transcriptions
-        text = re.sub(rf'\[.*?\]', '', text)  # tagged markup
-        text = re.sub(rf'\s*\(\s*\)\s*', '', text)  # empty brackets
-        text = re.sub(rf'^\s*;*', '', text)
-        text = re.sub(rf'\s*;(\s*;)*\s*', '; ', text)
-        return text.strip()
-
+    
     def get_examples(self, word):
         phrases = []
         word_info = self[word]
@@ -177,4 +253,13 @@ class DslBaseDictionary(BaseDictionary):
             trans = ''.join([m.inner_text() for m in markup[1:]])  # the rest for translation
             phrases.append((lang, trans))
         return phrases
+
+    def translate_word_chunked(self, word, chunk_factory) -> List:
+        word_info = self.get_raw_word_info(word)
+        if word_info is None:
+            return list()
+        markup = DslMarkup(word_info)
+        walker = ChopperWalker(ignore_tags={'b'}, factory=chunk_factory, default_language=self.native_language)
+        walker.walk(markup)
+        return walker.chunks
 

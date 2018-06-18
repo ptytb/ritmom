@@ -22,11 +22,13 @@ class BaseDictionary(ABC):
     def get_examples(self, word) -> List[Tuple[str, str]]:
         ...
 
-    def translate_word(self, word):
-        trans = self.dictionary_data.get(word, None)
-        if trans is None:
-            return trans
-        return self._filter_formatting(trans)
+    def get_raw_word_info(self, word):
+        word_info = self.dictionary_data.get(word, None)
+        return word_info
+
+    @abstractmethod
+    def translate_word_chunked(self, word, chunk_factory) -> List:
+        ...
 
     def _save_cache(self):
         dictionary_cache_path = f'{self.cache_dir}/{self.dictionary_header[self.cache_id_header]}.dic'
@@ -58,10 +60,6 @@ class BaseDictionary(ABC):
         dictionary.language_pair = language_pair
         dictionary.foreign_language, dictionary.native_language = split_name_pair(language_pair)
         return dictionary
-
-    @staticmethod
-    def _filter_formatting(text):
-        raise NotImplementedError()
 
     def __getitem__(self, item):
         return self.dictionary_data.get(item, None)

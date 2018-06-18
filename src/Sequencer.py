@@ -3,12 +3,14 @@ from typing import Deque, List
 import attr
 
 from src.filter.AddFurigana import AddFurigana
+from src.filter.AddVoice import AddVoice
 from src.filter.BaseFilter import BaseFilter
 from src.filter.ExplainKanji import ExplainKanji
 from src.filter.PronounceByLetter import PronounceByLetter
 from src.filter.StubFinalizer import StubFinalizer
 from src.utils.lists import flatten
 from src.filter.TidyUpText import TidyUpText
+from src.filter.SplitMixedLanguages import SplitMixedLanguages
 
 
 def make_range_validator(low, high):
@@ -47,6 +49,12 @@ class Chunk:
 
 @attr.s
 class ControlChunk(Chunk):
+    ...
+
+
+@attr.s
+class FilterControlChunk(ControlChunk):
+    instant = attr.ib(type=bool)
     target = attr.ib(type=BaseFilter)  # Which filter we want to control
     attribute = attr.ib(type=str)
     value = attr.ib()
@@ -71,9 +79,12 @@ class AudioChunkMixin:
                    default=0)
 
 
-@attr.s
+@attr.s(repr=False)
 class SpeechChunk(AudioChunkMixin, TextChunk):
     voice = attr.ib(default=None)
+    
+    def __repr__(self):
+        return self.voice.Id.rpartition('\\')[-1]
 
 
 @attr.s
@@ -107,26 +118,36 @@ class Sequencer:
     def __init__(self):
         self.queue: Deque[Chunk] = deque()
         self.chunk_processor = ChunkProcessor(filters=[
+            TidyUpText(),
+            SplitMixedLanguages(),
             PronounceByLetter(),
             AddFurigana(),
             ExplainKanji(),
-            TidyUpText(),
+            AddVoice(),
             StubFinalizer()
         ])
+    
+    def __lshift__(self, chunk):
+        self.append(chunk)
+        return self
+    
+    def _apply_control_chunk(self, chunk: ControlChunk):
+        if isinstance(chunk, FilterControlChunk) and issubclass(chunk.target, BaseFilter):
+            for f in self.chunk_processor.filters:
+                if isinstance(f, chunk.target):
+                    setattr(f, chunk.attribute, chunk.value)
 
     def append(self, chunk: Chunk):
         if isinstance(chunk, ControlChunk):
-            if issubclass(chunk.target, BaseFilter):
-                for f in self.chunk_processor.filters:
-                    if isinstance(f, chunk.target):
-                        setattr(f, chunk.attribute, chunk.value)
-                        return
+            if chunk.instant:
+                self._apply_control_chunk(chunk)
             else:
-                return
-                
+                self.queue.appendleft(chunk)
+            return
         flat = flatten([attr.evolve(chunk)])  # copy as an alternative to immutability
         for chunk in flat:
-            self.queue.extendleft(self.chunk_processor.apply_filters(chunk))
+            filtered = self.chunk_processor.apply_filters(chunk)
+            self.queue.extendleft(filtered)
 
     def __len__(self):
         return len(self.queue)
@@ -134,5 +155,6 @@ class Sequencer:
     def pop(self):
         chunk = self.queue.pop()
         if isinstance(chunk, ControlChunk):
+            self._apply_control_chunk(chunk)
             chunk = None
         return chunk

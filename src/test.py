@@ -9,6 +9,7 @@ from src.PhraseExamples import PhraseExamples
 from src.dictionary.LdxDictionary import LdxBaseDictionary
 from src.dictionary.DslDictionary import DslBaseDictionary
 from src.filter.AddFurigana import AddFurigana
+from src.filter.AddVoice import AddVoice
 from src.filter.ExpandContractions import ExpandContractions
 from src.filter.ExplainJapaneseSentences import ExplainJapaneseSentences
 from src.filter.ExplainKanji import ExplainKanji
@@ -26,6 +27,9 @@ class TestDictionaryReaders(unittest.TestCase):
     cache_dir = rf"{modules['src'].__path__[0]}\{pardir}\cache"
 
     def test_dsl(self):
+        from src.dictionary.DslDictionary import DslMarkup, ChopperWalker
+        from src.Sequencer import TextChunk
+        
         dsl = DslBaseDictionary(r'D:\prog\GoldenDict\content\En-Ru-Apresyan.dsl.dz',
                                 'utf-16',
                                 self.cache_dir)
@@ -33,11 +37,20 @@ class TestDictionaryReaders(unittest.TestCase):
         for header in {'NAME', 'INDEX_LANGUAGE', 'CONTENTS_LANGUAGE'}:
             self.assertIn(header, dsl.dictionary_header)
 
-        self.assertRegex(dsl.translate_word("'cellist"), r'виолончелист')
-        self.assertRegex(dsl.translate_word("clobber"), r'тряпьё')
-        self.assertRegex(dsl.translate_word("deliberate"), r'намерен')
+        self.assertRegex(dsl.get_raw_word_info("'cellist"), r'виолончелист')
+        self.assertRegex(dsl.get_raw_word_info("clobber"), r'тряпьё')
+        self.assertRegex(dsl.get_raw_word_info("deliberate"), r'намерен')
         self.assertEqual(len(dsl.get_examples('deliberate')), 13)
         self.assertEqual(len(dsl.get_examples('faux pas')), 1)
+        
+        def chunk_factory(*, language, text):
+            return TextChunk(text=text, language=language)
+
+        trans = dsl.dictionary_data.get('tramp', None)
+        markup = DslMarkup(trans)
+        walker = ChopperWalker(ignore_tags={'b'}, factory=chunk_factory, default_language=dsl.native_language)
+        walker.walk(markup)
+        text = walker.chunks
 
     def test_ldx(self):
         dsl = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx',
@@ -45,16 +58,16 @@ class TestDictionaryReaders(unittest.TestCase):
                                 self.cache_dir)
 
         self.assertEqual(dsl.dictionary_header['type'], 'LDX')
-        self.assertRegex(dsl.translate_word("cellist"), r'виолончелист')
-        self.assertRegex(dsl.translate_word("clobber"), r'колошматить')
-        self.assertRegex(dsl.translate_word("fie"), r'фу')
+        self.assertRegex(dsl.get_raw_word_info("cellist"), r'виолончелист')
+        self.assertRegex(dsl.get_raw_word_info("clobber"), r'колошматить')
+        self.assertRegex(dsl.get_raw_word_info("fie"), r'фу')
 
         dsl = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx',
                                 'utf-8',
                                 self.cache_dir)
 
         self.assertEqual(dsl.dictionary_header['type'], 'LDX')
-        self.assertRegex(dsl.translate_word('nana'), 'grandmother')
+        self.assertRegex(dsl.get_raw_word_info('nana'), 'grandmother')
         # self.assertNotRegex(dsl.translate_word('tangerine'), 'rine')
 
     def test_chunk_preprocessing(self):
@@ -122,7 +135,7 @@ class TestDictionaryReaders(unittest.TestCase):
     def test_split_mixed_languages(self):
         from src.Sequencer import TextChunk, ChunkProcessor
         a = TextChunk(text='hi there привет こんにちは', language='english', audible=True, printable=True, final=False)
-        p0 = ChunkProcessor(filters=[SplitMixedLanguages(), StubFinalizer()])
+        p0 = ChunkProcessor(filters=[SplitMixedLanguages(), AddVoice(), StubFinalizer()])
         result = p0.apply_filters(a)
         assert result[0].language == 'english'
         assert result[1].language == 'russian'

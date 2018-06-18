@@ -3,6 +3,7 @@ import struct
 import mmap
 import zlib
 from collections import namedtuple
+from typing import List
 
 from src.utils.term_progress import print_progressbar
 from .BaseDictionary import BaseDictionary
@@ -157,5 +158,9 @@ class LdxBaseDictionary(BaseDictionary):
         return text
 
     def get_examples(self, word):
-        word_info = self[word]
+        word_info = self.get_raw_word_info(word)
         return list()
+    
+    def translate_word_chunked(self, word, chunk_factory) -> List:
+        pass
+

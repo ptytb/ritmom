@@ -33,23 +33,23 @@ class Translator(metaclass=Singleton):
             self.dictionaries[language_pair].append(dictionary)
             self.all_dictionaries.append(dictionary)
 
-    def translate(self, phrase, language_pair=None):
+    def translate(self, word, language_pair=None):
+        def chunk_factory(*, language, text):
+            return TextChunk(text=text, language=language)
+
         if language_pair and language_pair in self.dictionaries:
             dictionaries = self.dictionaries[language_pair]
         else:
             dictionaries = self.all_dictionaries
 
-        summary = None
+        result = list()
 
         for d in dictionaries:
-            trans = d.translate_word(phrase)
-            if trans:
-                if not summary:
-                    summary = trans
-                else:
-                    summary += ';' + trans
+            chunks = d.translate_word_chunked(word, chunk_factory)
+            if chunks:
+                result.extend(chunks)
 
-        return summary
+        return result
 
     def get_examples(self, word, language):
 

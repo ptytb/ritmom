@@ -7,19 +7,21 @@ class ExpandContractions(BaseFilter):
 
     contractions = {
         "english": {
-            "smb": "somebody",
-            "smth": "something"
+            "smb.": "somebody",
+            "smth.": "something"
         },
         "russian": {
-            "кто-л": "кто-либо",
-            "кого-л": "кого-либо",
-            "кому-л": "кому-либо",
-            "кем-л": "кем-либо",
-            "ком-л": "ком-либо",
-            "что-л": "что-либо",
-            "чему-л": "чему-либо",
-            "чем-л": "чем-либо",
-            "чём-л": "чём-либо",
+            "кто-л.": "кто-либо",
+            "кого-л.": "кого-либо",
+            "кому-л.": "кому-либо",
+            "кем-л.": "кем-либо",
+            "ком-л.": "ком-либо",
+            "что-л.": "что-либо",
+            "чему-л.": "чему-либо",
+            "чем-л.": "чем-либо",
+            "чём-л.": "чём-либо",
+            r"т.\sп.": "тому подобное",
+            r"т.\sд.": "так далее",
         }
     }
     
@@ -29,5 +31,5 @@ class ExpandContractions(BaseFilter):
         if isinstance(chunk, TextChunk) and chunk.language in self.contractions:
             contractions = self.contractions[chunk.language]
             for abbr in contractions:
-                chunk.text = sub(f'{abbr}.', contractions[abbr], chunk.text)
+                chunk.text = sub(abbr, contractions[abbr], chunk.text)
         return result

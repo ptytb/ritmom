@@ -18,7 +18,7 @@ import sys
 sys.path.append(r'.')
 import src
 
-from src.AudioBuilder import AudioBuilder
+from src.SequenceBuilder import SequenceBuilder
 from src.AudioEncoderWorker import AudioEncoderWorker
 from src.WordNetCache import WordNetCache
 
@@ -50,7 +50,7 @@ def list_engines():
         print(f'#{i} {desc}')
 
 
-def init_audio_builder(_encode_queue, _app_config, _lock, _only_wav):
+def init_audio_builder(_encode_queue, _app_config, _lock, _only_wav, _dump_sequencer_log):
     """
     This will initialize a worker process
     :param _encode_queue:
@@ -58,11 +58,12 @@ def init_audio_builder(_encode_queue, _app_config, _lock, _only_wav):
     :param _lock:
     :return:
     """
-    global audio_builder
+    global sequence_builder
     WordNetCache._lock = _lock
-    audio_builder = AudioBuilder(app_config=_app_config,
-                                 encode_queue=_encode_queue,
-                                 only_wav=_only_wav)
+    sequence_builder = SequenceBuilder(app_config=_app_config,
+                                       encode_queue=_encode_queue,
+                                       only_wav=_only_wav,
+                                       dump_sequencer_log=_dump_sequencer_log)
 
 
 def make_audio_track(language_pair, items, part_number):
@@ -73,9 +74,9 @@ def make_audio_track(language_pair, items, part_number):
     :param part_number:
     :return:
     """
-    global audio_builder
+    global sequence_builder
     try:
-        audio_builder.make_audio_track(language_pair, items, part_number)
+        sequence_builder.make_audio_track(language_pair, items, part_number)
     except Exception as e:
         print(str(e))
         print_exc()
@@ -99,6 +100,7 @@ if __name__ == '__main__':
         parser.add_argument('-l', help='List voice engines', action='store_true')
         parser.add_argument('-w', help='Write WAV only, skip conversion to MP3', action='store_true')
         parser.add_argument('-s', help='Start RPC server', action='store_true')
+        parser.add_argument('-d', help='Dump sequencer log for each output part', action='store_true')
         args = parser.parse_args()
 
         if args.l:
@@ -139,7 +141,7 @@ if __name__ == '__main__':
 
             with Pool(processes=cpu_count() // 2,
                       initializer=init_audio_builder,
-                      initargs=(encode_queue, app_config, _lock, args.w)) as pool:
+                      initargs=(encode_queue, app_config, _lock, args.w, args.d)) as pool:
 
                 builder_queue: Dict[str, List[Tuple]] = dict()
                 builder_parts: Counter = Counter()
