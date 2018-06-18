@@ -159,7 +159,7 @@ class SequenceBuilder:
 
             sequencer_commands = map(repr, self.sequencer.queue)
             with open(f'text/{language_pair}/audio{track_num:03}.log', mode='wt', encoding='utf-8') as f:
-                f.writelines(interleave_with_newline(sequencer_commands))
+                f.writelines(interleave_with_newline(reversed(list(sequencer_commands))))
 
         while len(self.sequencer):
             chunk = self.sequencer.pop()

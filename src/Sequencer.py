@@ -84,7 +84,11 @@ class SpeechChunk(AudioChunkMixin, TextChunk):
     voice = attr.ib(default=None)
     
     def __repr__(self):
-        return self.voice.Id.rpartition('\\')[-1]
+        voice_id = self.voice.Id.rpartition('\\')[-1]
+        result = [(a.name, getattr(self, a.name, attr.NOTHING) if a.name != 'voice' else voice_id)
+                  for a in attr.fields(self.__class__)]
+        qualname = getattr(self, '__qualname__', self.__class__.__name__)
+        return f'{qualname}({", ".join([f"{name}={value}" for name, value in result])})'
 
 
 @attr.s

@@ -1,1 +1,1 @@
-@python src/main.py -d %*
+@py src/main.py -d %*

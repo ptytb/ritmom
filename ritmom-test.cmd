@@ -1,1 +1,1 @@
-@python -m unittest discover -s . -p "test.py"
+@py -m unittest discover -s . -p "test.py"
