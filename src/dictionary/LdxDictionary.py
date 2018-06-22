@@ -5,8 +5,41 @@ import zlib
 from collections import namedtuple
 from typing import List
 
+import xml.sax
+import xml.sax.handler
+from io import StringIO
+
 from src.utils.term_progress import print_progressbar
 from .BaseDictionary import BaseDictionary
+
+
+class LdxXMLEntryWalker(xml.sax.handler.ContentHandler):
+    """
+    Traverses LDX entry just to accumulate inner text
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.mapping = {}
+        self.buffer = ''
+        self.ignore_tags = {
+            'U'  # LDX: part of speech
+        }
+        self.ignore_counter = 0
+    
+    def startElement(self, name, attributes):
+        if name == "N":
+            self.buffer = ""
+        elif name in self.ignore_tags:
+            self.ignore_counter += 1
+    
+    def characters(self, data):
+        if self.ignore_counter == 0:
+            self.buffer += data
+    
+    def endElement(self, name):
+        if name in self.ignore_tags:
+            self.ignore_counter -= 1
 
 
 IndexData = namedtuple('IndexData', [
@@ -162,5 +195,18 @@ class LdxBaseDictionary(BaseDictionary):
         return list()
     
     def translate_word_chunked(self, word, chunk_factory) -> List:
-        pass
+        word_info = self.get_raw_word_info(word)
+        if word_info is None:
+            return list()
+        
+        parser = xml.sax.make_parser()
+        walker = LdxXMLEntryWalker()
+        parser.setContentHandler(walker)
+        parser.parse(StringIO(word_info))
+
+        def factory(text):
+            return chunk_factory(language=self.native_language, text=text.strip())
+        
+        chunks_map = map(factory, walker.buffer.split(';'))
+        return list(chunks_map)
 

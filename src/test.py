@@ -43,32 +43,42 @@ class TestDictionaryReaders(unittest.TestCase):
         self.assertEqual(len(dsl.get_examples('deliberate')), 13)
         self.assertEqual(len(dsl.get_examples('faux pas')), 1)
         
-        def chunk_factory(*, language, text):
-            return TextChunk(text=text, language=language)
-
         trans = dsl.dictionary_data.get('tramp', None)
         markup = DslMarkup(trans)
-        walker = ChopperWalker(ignore_tags={'b'}, factory=chunk_factory, default_language=dsl.native_language)
+        walker = ChopperWalker(ignore_tags={'b'}, factory=TextChunk, default_language=dsl.native_language)
         walker.walk(markup)
         text = walker.chunks
 
     def test_ldx(self):
-        dsl = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx',
-                                'utf-8',
-                                self.cache_dir)
+        from src.Sequencer import TextChunk
+        
+        ldx_co = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Concise English Dictionary_A3F32E03C1866047BF2A3B9D5AAB4C47.ldx',
+                                   'utf-8',
+                                   self.cache_dir)
+        
+        ldx_ru = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx',
+                                   'utf-8',
+                                   self.cache_dir)
 
-        self.assertEqual(dsl.dictionary_header['type'], 'LDX')
-        self.assertRegex(dsl.get_raw_word_info("cellist"), r'виолончелист')
-        self.assertRegex(dsl.get_raw_word_info("clobber"), r'колошматить')
-        self.assertRegex(dsl.get_raw_word_info("fie"), r'фу')
+        self.assertEqual(ldx_ru.dictionary_header['type'], 'LDX')
+        self.assertRegex(ldx_ru.get_raw_word_info("take"), r'брать')
+        self.assertRegex(ldx_ru.get_raw_word_info("cellist"), r'виолончелист')
+        
+        chunk = ldx_ru.translate_word_chunked("clobber", TextChunk)[0]
+        self.assertRegex(chunk.text, r'колошматить')
 
-        dsl = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx',
-                                'utf-8',
-                                self.cache_dir)
+        chunk = ldx_ru.translate_word_chunked("fie", TextChunk)[0]
+        self.assertRegex(chunk.text, r'фу')
 
-        self.assertEqual(dsl.dictionary_header['type'], 'LDX')
-        self.assertRegex(dsl.get_raw_word_info('nana'), 'grandmother')
-        # self.assertNotRegex(dsl.translate_word('tangerine'), 'rine')
+        ldx_en = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx',
+                                   'utf-8',
+                                   self.cache_dir)
+
+        self.assertEqual(ldx_en.dictionary_header['type'], 'LDX')
+        self.assertRegex(ldx_en.get_raw_word_info('nana'), 'grandmother')
+        ldx_en.get_examples('outlast')
+        ldx_en.get_raw_word_info('take')
+        # self.assertNotRegex(ldx.translate_word('tangerine'), 'rine')
 
     def test_chunk_preprocessing(self):
         from src.Sequencer import ChunkProcessor, TextChunk
@@ -133,13 +143,15 @@ class TestDictionaryReaders(unittest.TestCase):
         assert all(map(lambda s: s in result[0].text, ['somebody', 'something']))
         
     def test_split_mixed_languages(self):
-        from src.Sequencer import TextChunk, ChunkProcessor
+        from src.Sequencer import TextChunk, ChunkProcessor, JingleChunk
         a = TextChunk(text='hi there привет こんにちは', language='english', audible=True, printable=True, final=False)
         p0 = ChunkProcessor(filters=[SplitMixedLanguages(), AddVoice(), StubFinalizer()])
         result = p0.apply_filters(a)
         assert result[0].language == 'english'
-        assert result[1].language == 'russian'
-        assert result[2].language == 'japanese'
+        self.assertIsInstance(result[1], JingleChunk)
+        assert result[2].language == 'russian'
+        self.assertIsInstance(result[3], JingleChunk)
+        assert result[4].language == 'japanese'
 
 
 if __name__ == '__main__':

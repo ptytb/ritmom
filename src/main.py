@@ -106,6 +106,9 @@ if __name__ == '__main__':
         if args.l:
             list_engines()
             exit(0)
+        
+        if args.s:
+            raise NotImplementedError()
 
         time_start = datetime.utcnow()
 

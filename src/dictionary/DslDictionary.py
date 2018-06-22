@@ -10,8 +10,17 @@ from src.utils.term_progress import print_progressbar
 
 
 class DslMarkup:
+    """
+    Parses DSL dictionary info record and keeps tree structure (XML-like thingy)
+    """
 
     class DslMarkupSelector:
+        """
+        Utility for getting item from parsed DSL (*DslMarkup* instance),
+        or converting it to plain text.
+        Picked child items will be wrapped with *DslMarkupSelector* as well.
+        """
+        
         def __init__(self, root):
             self.root = root
 
@@ -116,6 +125,11 @@ class DslMarkup:
 
 
 class DslMarkupWalker(ABC):
+    """
+    Traverses *DslMarkup* instance and runs callbacks.
+    Subclass me and redefine desired callbacks.
+    """
+    
     def __init__(self, ignore_tags):
         self._ignore_tags = ignore_tags
         
@@ -155,8 +169,19 @@ class DslMarkupWalker(ABC):
 
 
 class ChopperWalker(DslMarkupWalker):
+    """
+    Traverses to the *DslMarkupWalker* instance and chops a dictionary info record into
+    the language-tagged pieces of text, which're actually being instanced
+    with *factory*
+    """
     
     def __init__(self, ignore_tags, factory, default_language):
+        """
+        
+        :param ignore_tags: Iterable containing tags we are not interested in
+        :param factory: Factory callable takes kwargs: text, language
+        :param default_language: Supposed to be the *native_language* of the dictionary
+        """
         super().__init__(ignore_tags)
         self.factory = factory
         self.default_language = default_language
@@ -258,6 +283,7 @@ class DslBaseDictionary(BaseDictionary):
         word_info = self.get_raw_word_info(word)
         if word_info is None:
             return list()
+        word_info = word_info.replace('~', word)  # '~' means the substitute for word we sought for
         markup = DslMarkup(word_info)
         walker = ChopperWalker(ignore_tags={'b'}, factory=chunk_factory, default_language=self.native_language)
         walker.walk(markup)

@@ -44,6 +44,12 @@
       "file": "D:\\prog\\lingoes\\user_data\\dict\\Vicon English Dictionary_3632FA73AD8738409E3BC214D8B0E91C.ldx"
     },
     {
+      "pair": "EnglishEnglish",
+      "type": "ldx",
+      "encoding": "utf-8",
+      "file": "D:\\prog\\lingoes\\user_data\\dict\\Concise English Dictionary_A3F32E03C1866047BF2A3B9D5AAB4C47.ldx"
+    },
+    {
       "pair": "JapaneseEnglish",
       "type": "ldx",
       "encoding": "utf-8",

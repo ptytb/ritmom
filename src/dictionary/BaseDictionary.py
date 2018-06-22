@@ -1,7 +1,7 @@
 import pickle
 from os.path import exists, abspath
 from abc import ABC, abstractmethod
-from typing import Tuple, List
+from typing import Tuple, List, Callable, Optional
 
 from src.utils.config import split_name_pair
 
@@ -22,12 +22,12 @@ class BaseDictionary(ABC):
     def get_examples(self, word) -> List[Tuple[str, str]]:
         ...
 
-    def get_raw_word_info(self, word):
+    def get_raw_word_info(self, word) -> Optional[str]:
         word_info = self.dictionary_data.get(word, None)
         return word_info
 
     @abstractmethod
-    def translate_word_chunked(self, word, chunk_factory) -> List:
+    def translate_word_chunked(self, word, chunk_factory: Callable) -> List:
         ...
 
     def _save_cache(self):
