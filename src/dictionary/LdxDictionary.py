@@ -98,7 +98,15 @@ class LdxBaseDictionary(BaseDictionary):
         self.dictionary_header['inflated_words_index_length'] = self.get_int(offset + 12)
         self.dictionary_header['inflated_words_length'] = self.get_int(offset + 16)
         self.dictionary_header['inflated_xml_length'] = self.get_int(offset + 20)
-        self.dictionary_header['definitions'] = (self.dictionary_header['compressed_data_header_offset'] - offset) // 4
+        self.dictionary_header['inflated_xml_offset'] = (self.dictionary_header['inflated_words_index_length'] +
+                                                             self.dictionary_header['inflated_words_length'])
+
+        self.dictionary_header['definitions'] = (self.dictionary_header['compressed_data_header_offset'] -
+                                                 self.dictionary_header['index_offset']) // 4
+        
+        self.dictionary_header['inflated_total_length'] = (self.dictionary_header['inflated_words_index_length'] +
+                                                           self.dictionary_header['inflated_words_length'] +
+                                                           self.dictionary_header['inflated_xml_length'])
 
         deflate_streams = list()
         self.position = self.dictionary_header['compressed_data_header_offset'] + 8
@@ -109,13 +117,14 @@ class LdxBaseDictionary(BaseDictionary):
             deflate_streams.append(stream_offset)
             self.position += 4
 
-        compressed_data_offset = self.position
+        self.dictionary_header['compressed_data_offset'] = self.position
         self.dictionary_header['streams'] = len(deflate_streams)
 
         inflated_data = bytearray()
         self._inflate_data(deflate_streams, inflated_data)
 
         if len(inflated_data):
+            self.position = self.dictionary_header['index_offset'] + 4 * self.dictionary_header['definitions']
             self._extract(inflated_data)
 
         self._save_cache()
@@ -154,19 +163,26 @@ class LdxBaseDictionary(BaseDictionary):
         index_data = self._get_index_data(inflated_data, data_len * i)
         last_word_pos = index_data.last_word_pos
         current_word_offset = index_data.current_word_offset
-        xml = str(inflated_data[xml_offset + index_data.last_xml_pos:xml_offset+index_data.current_xml_offset], encoding='utf-8', errors='ignore')
-        refs = index_data.refs
-        while refs > 0:
-            ref = self.get_int(definitions_offset + index_data.last_word_pos, buffer=inflated_data)
-            index_data = self._get_index_data(inflated_data, data_len * ref)
-            xml_chunk = inflated_data[xml_offset + index_data.last_xml_pos:xml_offset + index_data.current_xml_offset]
-            if len(xml) == 0:
-                xml = xml_chunk
-            else:
-                xml = f'{xml_chunk}, {xml}'
-            last_word_pos += 4
+        
+        xml_begin = xml_offset + index_data.last_xml_pos
+        xml_end = xml_offset + index_data.current_xml_offset
+        xml = str(inflated_data[xml_begin:xml_end], encoding='utf-8', errors='ignore')
 
-        word = str(inflated_data[definitions_offset + last_word_pos:definitions_offset + current_word_offset], encoding='utf-8', errors='ignore')
+        if len(xml) == 0:  # TODO: not sure about this condition, but we could got garbage in *ref* otherwise
+            refs = index_data.refs  # typically equals to 1 or 0
+            for _ in range(refs):
+                ref = self.get_int(definitions_offset + index_data.last_word_pos, buffer=inflated_data)
+                index_data = self._get_index_data(inflated_data, data_len * ref)
+                xml_chunk = str(inflated_data[xml_offset + index_data.last_xml_pos:
+                                              xml_offset + index_data.current_xml_offset])
+                if len(xml) == 0:
+                    xml = xml_chunk
+                else:
+                    xml = f'{xml_chunk} {xml}'
+                last_word_pos += 4
+
+        word = str(inflated_data[definitions_offset + last_word_pos:definitions_offset + current_word_offset],
+                   encoding='utf-8', errors='ignore')
         definition_data = word, xml
         return index_data, definition_data
 

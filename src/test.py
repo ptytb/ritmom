@@ -2,25 +2,7 @@ import unittest
 from json import load
 from os.path import pardir, abspath
 from sys import modules
-
 from pathtools.path import parent_dir_path
-
-from src.PhraseExamples import PhraseExamples
-from src.dictionary.LdxDictionary import LdxBaseDictionary
-from src.dictionary.DslDictionary import DslBaseDictionary
-from src.filter.AddFurigana import AddFurigana
-from src.filter.AddVoice import AddVoice
-from src.filter.ExpandContractions import ExpandContractions
-from src.filter.ExplainJapaneseSentences import ExplainJapaneseSentences
-from src.filter.ExplainKanji import ExplainKanji
-from src.filter.PronounceByLetter import PronounceByLetter
-from src.filter.SimilarKanji import jp_reverse
-from src.filter.SplitMixedLanguages import SplitMixedLanguages
-from src.filter.StubFinalizer import StubFinalizer
-from src.filter.TidyUpEnglish import TidyUpEnglish
-from src.filter.TidyUpText import TidyUpText
-
-from src.utils.config import split_name_pair
 
 
 class TestDictionaryReaders(unittest.TestCase):
@@ -29,6 +11,7 @@ class TestDictionaryReaders(unittest.TestCase):
     def test_dsl(self):
         from src.dictionary.DslDictionary import DslMarkup, ChopperWalker
         from src.Sequencer import TextChunk
+        from src.dictionary.DslDictionary import DslBaseDictionary
         
         dsl = DslBaseDictionary(r'D:\prog\GoldenDict\content\En-Ru-Apresyan.dsl.dz',
                                 'utf-16',
@@ -50,11 +33,18 @@ class TestDictionaryReaders(unittest.TestCase):
         text = walker.chunks
 
     def test_ldx(self):
+        from src.dictionary.LdxDictionary import LdxBaseDictionary
         from src.Sequencer import TextChunk
         
         ldx_co = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Concise English Dictionary_A3F32E03C1866047BF2A3B9D5AAB4C47.ldx',
                                    'utf-8',
                                    self.cache_dir)
+        
+        self.assertRegex(ldx_co.get_raw_word_info('$'), 'commercialism or greed')
+        self.assertRegex(ldx_co.get_raw_word_info('abide'), 'put up with something or somebody unpleasant')
+        self.assertRegex(ldx_co.get_raw_word_info('despise'), 'look down on with disdain')
+        self.assertRegex(ldx_co.get_raw_word_info('étude'), 'a short composition for a solo instrument')
+        self.assertRegex(ldx_co.get_raw_word_info('mindset'), 'mental attitude')
         
         ldx_ru = LdxBaseDictionary(r'D:\prog\lingoes\user_data\dict\Vicon English-Russian Dictionary_AB8E9FFF4E1B9B41A60C10CDA8820FD0.ldx',
                                    'utf-8',
@@ -82,7 +72,15 @@ class TestDictionaryReaders(unittest.TestCase):
 
     def test_chunk_preprocessing(self):
         from src.Sequencer import ChunkProcessor, TextChunk
-
+        from src.filter.AddFurigana import AddFurigana
+        from src.filter.ExplainJapaneseSentences import ExplainJapaneseSentences
+        from src.filter.ExplainKanji import ExplainKanji
+        from src.filter.PronounceByLetter import PronounceByLetter
+        from src.filter.SimilarKanji import jp_reverse
+        from src.filter.TidyUpEnglish import TidyUpEnglish
+        from src.filter.StubFinalizer import StubFinalizer
+        from src.filter.TidyUpText import TidyUpText
+        
         c0 = TextChunk(text='"some guy\'s bad text {', language='english', audible=True, printable=True, final=False)
         p0 = ChunkProcessor(filters=[TidyUpEnglish(), StubFinalizer()])
         result0 = p0.apply_filters(c0)
@@ -112,6 +110,7 @@ class TestDictionaryReaders(unittest.TestCase):
         pass
 
     def test_split(self):
+        from src.utils.config import split_name_pair
         a, b = split_name_pair('EnglishJapanese')
         self.assertEqual(a, 'english')
         self.assertEqual(b, 'japanese')
@@ -122,6 +121,8 @@ class TestDictionaryReaders(unittest.TestCase):
         b = a.promote(SpeechChunk, volume=75)
 
     def test_examples(self):
+        from src.PhraseExamples import PhraseExamples
+
         ritmom_root = parent_dir_path(parent_dir_path(abspath(__file__)))
 
         with open(f'{ritmom_root}/config.json') as f:
@@ -137,6 +138,9 @@ class TestDictionaryReaders(unittest.TestCase):
         
     def test_abbr(self):
         from src.Sequencer import TextChunk, ChunkProcessor
+        from src.filter.ExpandContractions import ExpandContractions
+        from src.filter.StubFinalizer import StubFinalizer
+
         a = TextChunk(text='to listen up to smb. and smth.', language='english', audible=True, printable=True, final=False)
         p0 = ChunkProcessor(filters=[ExpandContractions(), StubFinalizer()])
         result = p0.apply_filters(a)
@@ -144,6 +148,10 @@ class TestDictionaryReaders(unittest.TestCase):
         
     def test_split_mixed_languages(self):
         from src.Sequencer import TextChunk, ChunkProcessor, JingleChunk
+        from src.filter.AddVoice import AddVoice
+        from src.filter.SplitMixedLanguages import SplitMixedLanguages
+        from src.filter.StubFinalizer import StubFinalizer
+
         a = TextChunk(text='hi there привет こんにちは', language='english', audible=True, printable=True, final=False)
         p0 = ChunkProcessor(filters=[SplitMixedLanguages(), AddVoice(), StubFinalizer()])
         result = p0.apply_filters(a)
