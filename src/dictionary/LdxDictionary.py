@@ -28,9 +28,7 @@ class LdxXMLEntryWalker(xml.sax.handler.ContentHandler):
         self.ignore_counter = 0
     
     def startElement(self, name, attributes):
-        if name == "N":
-            self.buffer = ""
-        elif name in self.ignore_tags:
+        if name in self.ignore_tags:
             self.ignore_counter += 1
     
     def characters(self, data):
@@ -224,5 +222,5 @@ class LdxBaseDictionary(BaseDictionary):
             return chunk_factory(language=self.native_language, text=text.strip())
         
         chunks_map = map(factory, walker.buffer.split(';'))
-        return list(chunks_map)
+        return list()
 
